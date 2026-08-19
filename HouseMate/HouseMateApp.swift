@@ -11,7 +11,7 @@ import SwiftUI
 struct HouseMateApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            WelcomeView(viewModel: WelcomeViewModel())
         }
     }
 }
