@@ -10,6 +10,8 @@ import SwiftUI
 struct NotesCardView: View {
 
     let notes: [NoteModel]
+    var showsAddButton: Bool = true
+   
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -20,11 +22,13 @@ struct NotesCardView: View {
                     .fontWeight(.semibold)
 
                 Spacer()
-
-                Button {
-
-                } label: {
-                    Image(systemName: "plus")
+                if showsAddButton {
+                    
+                    Button {
+                        
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
 

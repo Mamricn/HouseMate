@@ -20,7 +20,7 @@ struct ShoppingItemRowView: View {
                 .font(.title3)
             
             Text(item.name)
-                .font(.body)
+                .font(.footnote)
             
             Spacer()
             

@@ -29,7 +29,7 @@ struct TabbarView: View {
                 .customTabBarSafeArea()
             
 
-        }
+        } 
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
         CustomTabBarView()

@@ -154,6 +154,40 @@ final class HomeViewModel {
                     < ($1.dueDate ?? .distantFuture)
             }
     }
+    
+    func toggleTaskStatus(_ task: TaskModel) {
+        guard let index = tasks.firstIndex(where: {
+            $0.id == task.id
+        }) else {
+            return
+        }
+
+        tasks[index].status =
+            tasks[index].status == .completed
+            ? .pending
+            : .completed
+    }
+
+    func toggleShoppingItem(_ item: ShoppingItemModel) {
+        guard let index = shoppingItems.firstIndex(where: {
+            $0.id == item.id
+        }) else {
+            return
+        }
+
+        shoppingItems[index].isPurchased.toggle()
+    }
+    
+    func markBillAsPaid(_ bill: BillModel) {
+        guard let index = bills.firstIndex(where: {
+            $0.id == bill.id
+        }) else {
+            return
+        }
+
+        bills[index].status = .paid
+        bills[index].paidByUserId = user.id
+    }
 }
 
 
@@ -171,22 +205,40 @@ struct HomeView: View {
 
                     TaskCardView(
                         tasks: viewModel.todaysTasks,
-                        members: viewModel.members
+                        members: viewModel.members,
+                        showsAddButton: false,
+                        onToggleStatus: { task in
+                            withAnimation {
+                                viewModel.toggleTaskStatus(task)
+                            }
+                        }
                     )
                     .dashboardShadow()
 
-                    NotesCardView(
-                        notes: viewModel.notesFromLastSevenDays
+                    NotesCardView(notes: viewModel.notesFromLastSevenDays,
+                                  showsAddButton: false
                     )
                     .dashboardShadow()
 
                     ShoppingCardView(
-                        items: viewModel.recentShoppingItems
+                        items: viewModel.recentShoppingItems,
+                        showsAddButton: false,
+                        onTogglePurchased: { item in
+                            withAnimation {
+                                viewModel.toggleShoppingItem(item)
+                            }
+                        }
                     )
                     .dashboardShadow()
 
                     BillsCardView(
-                        bills: viewModel.upcomingBills
+                        bills: viewModel.upcomingBills,
+                        showsAddButton: false,
+                        onMarkAsPaid: { bill in
+                            withAnimation {
+                                viewModel.markBillAsPaid(bill)
+                            }
+                        }
                     )
                     .dashboardShadow()
                 }

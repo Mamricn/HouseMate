@@ -10,6 +10,8 @@ import SwiftUI
 struct HouseholdMembersCardView: View {
     
     let members: [HouseholdMemberModel]
+    var showsAddButton: Bool = true
+    
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -21,10 +23,12 @@ struct HouseholdMembersCardView: View {
                 
                 Spacer()
                 
-                Button {
-                    
-                } label: {
-                    Image(systemName: "person.badge.plus")
+                if showsAddButton {
+                    Button {
+                        
+                    } label: {
+                        Image(systemName: "person.badge.plus")
+                    }
                 }
             }
             

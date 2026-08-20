@@ -11,6 +11,9 @@ struct HouseholdBoardCardView: View {
     
     let posts: [BoardPostModel]
     let users: [UserModel]
+    var showsAddButton: Bool = true
+    
+
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
