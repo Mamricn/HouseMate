@@ -11,8 +11,12 @@ struct BillsCardView: View {
 
     let bills: [BillModel]
 
+    var title: String = "Upcoming Bills"
     var showsAddButton: Bool = true
+
+    var onAdd: () -> Void = {}
     var onMarkAsPaid: (BillModel) -> Void = { _ in }
+    var onDelete: ((BillModel) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -34,7 +38,7 @@ struct BillsCardView: View {
 
     private var header: some View {
         HStack {
-            Text("Upcoming Bills")
+            Text(title)
                 .font(.title3)
                 .fontWeight(.semibold)
 
@@ -42,7 +46,7 @@ struct BillsCardView: View {
 
             if showsAddButton {
                 Button {
-
+                    onAdd()
                 } label: {
                     Image(systemName: "plus")
                         .font(.headline)
@@ -54,38 +58,75 @@ struct BillsCardView: View {
     // MARK: - Bills List
 
     private var billsList: some View {
-        List(bills) { bill in
-            BillRowView(bill: bill)
-                .listRowInsets(
-                    EdgeInsets(
-                        top: 4,
-                        leading: 0,
-                        bottom: 4,
-                        trailing: 0
-                    )
-                )
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .swipeActions(
-                    edge: .trailing,
-                    allowsFullSwipe: true
-                ) {
-                    Button {
-                        onMarkAsPaid(bill)
-                    } label: {
-                        Label(
-                            "Mark as Paid",
-                            systemImage: "checkmark.circle.fill"
+        List {
+            ForEach(bills) { bill in
+                BillRowView(bill: bill)
+                    .listRowInsets(
+                        EdgeInsets(
+                            top: 4,
+                            leading: 0,
+                            bottom: 4,
+                            trailing: 0
                         )
+                    )
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+
+                    // Delete po lewej stronie
+                    .swipeActions(
+                        edge: .leading,
+                        allowsFullSwipe: false
+                    ) {
+                        if onDelete != nil {
+                            deleteButton(for: bill)
+                        }
                     }
-                    .tint(.green)
-                }
+
+                    // Mark as Paid po prawej stronie
+                    .swipeActions(
+                        edge: .trailing,
+                        allowsFullSwipe: true
+                    ) {
+                        if bill.status != .paid {
+                            markAsPaidButton(for: bill)
+                        }
+                    }
+            }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: 180)
+    }
+
+    // MARK: - Swipe Action
+
+    private func markAsPaidButton(
+        for bill: BillModel
+    ) -> some View {
+        Button {
+            onMarkAsPaid(bill)
+        } label: {
+            Label(
+                "Mark as Paid",
+                systemImage: "checkmark.circle.fill"
+            )
+        }
+        .tint(.green)
+    }
+    
+    private func deleteButton(
+        for bill: BillModel
+    ) -> some View {
+        Button(role: .destructive) {
+            onDelete?(bill)
+        } label: {
+            Label(
+                "Delete",
+                systemImage: "trash.fill"
+            )
+        }
     }
 
     // MARK: - Empty State
@@ -95,12 +136,18 @@ struct BillsCardView: View {
             Image(systemName: "checkmark.circle")
                 .foregroundStyle(.green)
 
-            Text("No upcoming bills")
+            Text(emptyStateText)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
+    }
+
+    private var emptyStateText: String {
+        title == "All Bills"
+            ? "No bills yet"
+            : "No upcoming bills"
     }
 
     // MARK: - Background
@@ -126,9 +173,11 @@ struct BillsCardView: View {
 
 // MARK: - Previews
 
-#Preview("With Bills") {
+#Preview("Upcoming Bills") {
     BillsCardView(
         bills: BillModel.mockList,
+        title: "Upcoming Bills",
+        showsAddButton: false,
         onMarkAsPaid: { bill in
             print("Mark as paid: \(bill.title)")
         }
@@ -136,10 +185,14 @@ struct BillsCardView: View {
     .padding()
 }
 
-#Preview("Without Add Button") {
+#Preview("All Bills") {
     BillsCardView(
         bills: BillModel.mockList,
-        showsAddButton: false,
+        title: "All Bills",
+        showsAddButton: true,
+        onAdd: {
+            print("Add bill")
+        },
         onMarkAsPaid: { bill in
             print("Mark as paid: \(bill.title)")
         }
@@ -150,7 +203,8 @@ struct BillsCardView: View {
 #Preview("Empty") {
     BillsCardView(
         bills: [],
-        showsAddButton: false
+        title: "All Bills",
+        showsAddButton: true
     )
     .padding()
 }

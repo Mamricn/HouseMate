@@ -233,6 +233,7 @@ struct HomeView: View {
 
                     BillsCardView(
                         bills: viewModel.upcomingBills,
+                        title: "Upcoming Bills",
                         showsAddButton: false,
                         onMarkAsPaid: { bill in
                             withAnimation {
