@@ -14,12 +14,48 @@ final class HouseholdViewModel {
 
     var currentUser: UserModel = UserModel.mockList[0]
 
-    var members: [HouseholdMemberModel] = HouseholdMemberModel.mockList
-    var tasks: [TaskModel] = TaskModel.mockList
-    var shoppingItems: [ShoppingItemModel] = ShoppingItemModel.mockList
-    var bills: [BillModel] = BillModel.mockList
+    var members: [HouseholdMemberModel] =
+        HouseholdMemberModel.mockList
+
+    var tasks: [TaskModel] =
+        TaskModel.mockList
+
+    var shoppingItems: [ShoppingItemModel] =
+        ShoppingItemModel.mockList
+
+    var bills: [BillModel] =
+        BillModel.mockList
 
     // MARK: - Task Actions
+
+    func addChore(
+        title: String,
+        description: String?,
+        assignedToUserId: String,
+        dueDate: Date,
+        isAllDay: Bool,
+        category: TaskCategory
+    ) {
+        guard let householdId = currentUser.householdId else {
+            return
+        }
+
+        let newTask = TaskModel(
+            taskId: UUID().uuidString,
+            householdId: householdId,
+            createdAt: .now,
+            title: title,
+            description: description,
+            assignedToUserId: assignedToUserId,
+            createdByUserId: currentUser.id,
+            dueDate: dueDate,
+            isAllDay: isAllDay,
+            status: .pending,
+            category: category
+        )
+
+        tasks.append(newTask)
+    }
 
     func toggleTaskStatus(_ task: TaskModel) {
         guard let index = tasks.firstIndex(where: {
@@ -91,6 +127,36 @@ final class HouseholdViewModel {
 
     // MARK: - Bill Actions
 
+    func addBill(
+        title: String,
+        amount: Double,
+        dueDate: Date,
+        category: BillCategory,
+        isRecurring: Bool,
+        recurrence: BillRecurrence?
+    ) {
+        guard let householdId = currentUser.householdId else {
+            return
+        }
+
+        let newBill = BillModel(
+            billId: UUID().uuidString,
+            householdId: householdId,
+            createdAt: .now,
+            title: title,
+            amount: amount,
+            dueDate: dueDate,
+            category: category,
+            createdByUserId: currentUser.id,
+            paidByUserId: nil,
+            status: .upcoming,
+            isRecurring: isRecurring,
+            recurrence: recurrence
+        )
+
+        bills.append(newBill)
+    }
+
     func markBillAsPaid(_ bill: BillModel) {
         guard let index = bills.firstIndex(where: {
             $0.id == bill.id
@@ -109,11 +175,23 @@ final class HouseholdViewModel {
     }
 }
 
+// MARK: - Sheet
+
+private enum HouseholdSheet: String, Identifiable {
+    case chore
+    case shoppingItem
+    case bill
+
+    var id: String {
+        rawValue
+    }
+}
+
 struct HouseholdView: View {
 
-    @State var viewModel: HouseholdViewModel
+    @Bindable var viewModel: HouseholdViewModel
 
-    @State private var showsAddShoppingItem = false
+    @State private var activeSheet: HouseholdSheet?
     @State private var toast: AppToast?
 
     var body: some View {
@@ -122,10 +200,8 @@ struct HouseholdView: View {
             content
             toastOverlay
         }
-        .sheet(
-            isPresented: $showsAddShoppingItem
-        ) {
-            addShoppingItemSheet
+        .sheet(item: $activeSheet) { sheet in
+            sheetContent(for: sheet)
         }
     }
 
@@ -179,7 +255,7 @@ struct HouseholdView: View {
             members: viewModel.members,
             showsAddButton: true,
             onAdd: {
-                addChore()
+                activeSheet = .chore
             },
             onToggleStatus: { task in
                 withAnimation {
@@ -220,7 +296,7 @@ struct HouseholdView: View {
             items: viewModel.shoppingItems,
             showsAddButton: true,
             onAdd: {
-                showsAddShoppingItem = true
+                activeSheet = .shoppingItem
             },
             onTogglePurchased: { item in
                 withAnimation {
@@ -273,7 +349,7 @@ struct HouseholdView: View {
             title: "All Bills",
             showsAddButton: true,
             onAdd: {
-                addBill()
+                activeSheet = .bill
             },
             onMarkAsPaid: { bill in
                 withAnimation {
@@ -301,9 +377,58 @@ struct HouseholdView: View {
         .householdCardShadow()
     }
 
-    // MARK: - Shopping Sheet
+    // MARK: - Sheets
 
-    private var addShoppingItemSheet: some View {
+    @ViewBuilder
+    private func sheetContent(
+        for sheet: HouseholdSheet
+    ) -> some View {
+        switch sheet {
+        case .chore:
+            choreSheet
+
+        case .shoppingItem:
+            shoppingItemSheet
+
+        case .bill:
+            billSheet
+        }
+    }
+
+    private var choreSheet: some View {
+        AddChoreView(
+            members: viewModel.members,
+            selectedDate: viewModel.selectedDate
+        ) {
+            title,
+            description,
+            assignedToUserId,
+            dueDate,
+            isAllDay,
+            category in
+
+            withAnimation {
+                viewModel.addChore(
+                    title: title,
+                    description: description,
+                    assignedToUserId: assignedToUserId,
+                    dueDate: dueDate,
+                    isAllDay: isAllDay,
+                    category: category
+                )
+            }
+
+            showToast(
+                message: "\(title) scheduled",
+                systemImage: "calendar.badge.plus",
+                color: .green
+            )
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var shoppingItemSheet: some View {
         AddShoppingItemView { name, quantity in
             withAnimation {
                 viewModel.addShoppingItem(
@@ -319,6 +444,36 @@ struct HouseholdView: View {
             )
         }
         .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var billSheet: some View {
+        AddBillView {
+            title,
+            amount,
+            dueDate,
+            category,
+            isRecurring,
+            recurrence in
+
+            withAnimation {
+                viewModel.addBill(
+                    title: title,
+                    amount: amount,
+                    dueDate: dueDate,
+                    category: category,
+                    isRecurring: isRecurring,
+                    recurrence: recurrence
+                )
+            }
+
+            showToast(
+                message: "\(title) added",
+                systemImage: "creditcard.fill",
+                color: .green
+            )
+        }
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 
@@ -368,16 +523,6 @@ struct HouseholdView: View {
                 toast = nil
             }
         }
-    }
-
-    // MARK: - Add Actions
-
-    private func addChore() {
-        // Tutaj później otworzymy AddChoreView.
-    }
-
-    private func addBill() {
-        // Tutaj później otworzymy AddBillView.
     }
 
     // MARK: - Background

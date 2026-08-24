@@ -5,26 +5,40 @@
 //  Created by Marcin Turek on 17/08/2026.
 //
 
+
 import SwiftUI
-
-
 
 @Observable
 final class HomeViewModel {
 
-    var user: UserModel = UserModel.mockList[0]
+    var user: UserModel =
+        UserModel.mockList[0]
 
-    var tasks: [TaskModel] = TaskModel.mockList
-    var notes: [NoteModel] = NoteModel.mockList
-    var shoppingItems: [ShoppingItemModel] = ShoppingItemModel.mockList
-    var bills: [BillModel] = BillModel.mockList
-    var members: [HouseholdMemberModel] = HouseholdMemberModel.mockList
+    var tasks: [TaskModel] =
+        TaskModel.mockList
 
-    private let calendar = Calendar.autoupdatingCurrent
+    var notes: [NoteModel] =
+        NoteModel.mockList
+
+    var shoppingItems: [ShoppingItemModel] =
+        ShoppingItemModel.mockList
+
+    var bills: [BillModel] =
+        BillModel.mockList
+
+    var members: [HouseholdMemberModel] =
+        HouseholdMemberModel.mockList
+
+    private let calendar =
+        Calendar.autoupdatingCurrent
+
+    // MARK: - User
 
     var userName: String {
         let name = user.name?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
 
         guard let name, !name.isEmpty else {
             return "there"
@@ -42,7 +56,8 @@ final class HomeViewModel {
         )
     }
 
-    // Zadania przypisane do użytkownika na dzisiaj
+    // MARK: - Today's Tasks
+
     var todaysTasks: [TaskModel] {
         tasks
             .filter { task in
@@ -59,7 +74,8 @@ final class HomeViewModel {
             }
     }
 
-    // Notatki z ostatnich 7 dni
+    // MARK: - Recent Notes
+
     var notesFromLastSevenDays: [NoteModel] {
         let today = calendar.startOfDay(for: .now)
 
@@ -93,7 +109,8 @@ final class HomeViewModel {
             }
     }
 
-    // Produkty dodane dzisiaj lub wczoraj
+    // MARK: - Recent Shopping Items
+
     var recentShoppingItems: [ShoppingItemModel] {
         let today = calendar.startOfDay(for: .now)
 
@@ -127,7 +144,8 @@ final class HomeViewModel {
             }
     }
 
-    // Rachunki na dzisiaj i kolejne 3 dni
+    // MARK: - Upcoming Bills
+
     var upcomingBills: [BillModel] {
         let today = calendar.startOfDay(for: .now)
 
@@ -154,7 +172,9 @@ final class HomeViewModel {
                     < ($1.dueDate ?? .distantFuture)
             }
     }
-    
+
+    // MARK: - Task Actions
+
     func toggleTaskStatus(_ task: TaskModel) {
         guard let index = tasks.firstIndex(where: {
             $0.id == task.id
@@ -168,7 +188,11 @@ final class HomeViewModel {
             : .completed
     }
 
-    func toggleShoppingItem(_ item: ShoppingItemModel) {
+    // MARK: - Shopping Actions
+
+    func toggleShoppingItem(
+        _ item: ShoppingItemModel
+    ) {
         guard let index = shoppingItems.firstIndex(where: {
             $0.id == item.id
         }) else {
@@ -177,7 +201,9 @@ final class HomeViewModel {
 
         shoppingItems[index].isPurchased.toggle()
     }
-    
+
+    // MARK: - Bill Actions
+
     func markBillAsPaid(_ bill: BillModel) {
         guard let index = bills.firstIndex(where: {
             $0.id == bill.id
@@ -190,65 +216,46 @@ final class HomeViewModel {
     }
 }
 
-
 struct HomeView: View {
 
-    @State var viewModel: HomeViewModel
+    let viewModel: HomeViewModel
+    @State private var showsSettings = false
 
     var body: some View {
         ZStack {
             backgroundGradient
-
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 20) {
-                    header
-
-                    TaskCardView(
-                        tasks: viewModel.todaysTasks,
-                        members: viewModel.members,
-                        showsAddButton: false,
-                        onToggleStatus: { task in
-                            withAnimation {
-                                viewModel.toggleTaskStatus(task)
-                            }
-                        }
-                    )
-                    .dashboardShadow()
-
-                    NotesCardView(notes: viewModel.notesFromLastSevenDays,
-                                  showsAddButton: false
-                    )
-                    .dashboardShadow()
-
-                    ShoppingCardView(
-                        items: viewModel.recentShoppingItems,
-                        showsAddButton: false,
-                        onTogglePurchased: { item in
-                            withAnimation {
-                                viewModel.toggleShoppingItem(item)
-                            }
-                        }
-                    )
-                    .dashboardShadow()
-
-                    BillsCardView(
-                        bills: viewModel.upcomingBills,
-                        title: "Upcoming Bills",
-                        showsAddButton: false,
-                        onMarkAsPaid: { bill in
-                            withAnimation {
-                                viewModel.markBillAsPaid(bill)
-                            }
-                        }
-                    )
-                    .dashboardShadow()
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .padding(.bottom, 35)
-            }
-            .scrollIndicators(.hidden)
+            content
         }
+        .sheet(
+            isPresented: $showsSettings
+        ) {
+            SettingsView(
+                user: viewModel.user
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    // MARK: - Content
+
+    private var content: some View {
+        ScrollView {
+            LazyVStack(
+                alignment: .leading,
+                spacing: 20
+            ) {
+                header
+                tasksCard
+                notesCard
+                shoppingCard
+                billsCard
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 35)
+        }
+        .scrollIndicators(.hidden)
     }
 
     // MARK: - Header
@@ -257,7 +264,13 @@ struct HomeView: View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Hello \(viewModel.userName)")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(
+                        .system(
+                            size: 30,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
 
                 Text("It’s \(viewModel.formattedToday)")
                     .font(.subheadline)
@@ -266,31 +279,104 @@ struct HomeView: View {
 
             Spacer()
 
-            profileImage
+            profileButton
         }
         .padding(.horizontal, 4)
         .padding(.bottom, 8)
     }
 
-    private var profileImage: some View {
-        ZStack {
-            Circle()
-                .fill(.ultraThinMaterial)
+    // MARK: - Profile Button
 
-            Image(systemName: "person.fill")
-                .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(.blue)
+    private var profileButton: some View {
+        Button {
+            showsSettings = true
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(.ultraThinMaterial)
+
+                Image(systemName: "person.fill")
+                    .font(
+                        .system(
+                            size: 21,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(.blue)
+            }
+            .frame(width: 52, height: 52)
+            .overlay {
+                Circle()
+                    .stroke(
+                        .white.opacity(0.45),
+                        lineWidth: 1
+                    )
+            }
+            .shadow(
+                color: .blue.opacity(0.15),
+                radius: 10,
+                y: 5
+            )
         }
-        .frame(width: 52, height: 52)
-        .overlay {
-            Circle()
-                .stroke(.white.opacity(0.45), lineWidth: 1)
-        }
-        .shadow(
-            color: .blue.opacity(0.15),
-            radius: 10,
-            y: 5
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open settings")
+    }
+
+    // MARK: - Tasks Card
+
+    private var tasksCard: some View {
+        TaskCardView(
+            tasks: viewModel.todaysTasks,
+            members: viewModel.members,
+            showsAddButton: false,
+            onToggleStatus: { task in
+                withAnimation {
+                    viewModel.toggleTaskStatus(task)
+                }
+            }
         )
+        .dashboardShadow()
+    }
+
+    // MARK: - Notes Card
+
+    private var notesCard: some View {
+        NotesCardView(
+            notes: viewModel.notesFromLastSevenDays,
+            showsAddButton: false
+        )
+        .dashboardShadow()
+    }
+
+    // MARK: - Shopping Card
+
+    private var shoppingCard: some View {
+        ShoppingCardView(
+            items: viewModel.recentShoppingItems,
+            showsAddButton: false,
+            onTogglePurchased: { item in
+                withAnimation {
+                    viewModel.toggleShoppingItem(item)
+                }
+            }
+        )
+        .dashboardShadow()
+    }
+
+    // MARK: - Bills Card
+
+    private var billsCard: some View {
+        BillsCardView(
+            bills: viewModel.upcomingBills,
+            title: "Upcoming Bills",
+            showsAddButton: false,
+            onMarkAsPaid: { bill in
+                withAnimation {
+                    viewModel.markBillAsPaid(bill)
+                }
+            }
+        )
+        .dashboardShadow()
     }
 
     // MARK: - Background
@@ -326,19 +412,24 @@ struct HomeView: View {
     }
 }
 
+// MARK: - Dashboard Shadow
+
 private extension View {
 
     func dashboardShadow() -> some View {
-        self
-            .shadow(
-                color: Color.black.opacity(0.07),
-                radius: 14,
-                x: 0,
-                y: 7
-            )
+        shadow(
+            color: Color.black.opacity(0.07),
+            radius: 14,
+            x: 0,
+            y: 7
+        )
     }
 }
 
+// MARK: - Preview
+
 #Preview {
-    HomeView(viewModel: HomeViewModel())
+    HomeView(
+        viewModel: HomeViewModel()
+    )
 }

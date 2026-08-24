@@ -91,29 +91,77 @@ struct WelcomeView: View {
     }
     
     private var buttons: some View {
-        VStack(spacing: 20) {
-            
+        VStack(spacing: 14) {
+
             Button {
-                
+
+                // Routing do SignUpView
+
             } label: {
-                Text("Login")
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 10) {
+                    Text("Create an account")
+                        .fontWeight(.semibold)
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .blue,
+                                    .cyan
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .shadow(
+                            color: .blue.opacity(0.3),
+                            radius: 14,
+                            y: 8
+                        )
+                }
             }
-            .frame(maxWidth: 300)
-            .buttonStyle(.glass)
-            
-            
+            .buttonStyle(.plain)
+
             Button {
-                
+
+                // Routing do LoginView
+
             } label: {
-                Text("Sign up")
+                Text("Log in")
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background {
+                        Capsule(style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay {
+                                Capsule(style: .continuous)
+                                    .stroke(
+                                        .white.opacity(0.7),
+                                        lineWidth: 1
+                                    )
+                            }
+                    }
             }
-            .frame(maxWidth: 300)
-            .buttonStyle(.glass)
+            .buttonStyle(.plain)
+
+            Text("By continuing, you agree to our Terms and Privacy Policy.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 4)
         }
+        .frame(maxWidth: 340)
         .padding(.horizontal, 24)
-        .padding(.bottom, 40)
+        .padding(.bottom, 34)
     }
 }
 #Preview {
