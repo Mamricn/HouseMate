@@ -23,11 +23,14 @@ struct BillModel: Identifiable, Codable, Equatable {
     
     var createdByUserId: String
     var paidByUserId: String?
+    var paidAt: Date?
     
     var status: BillStatus
     
     var isRecurring: Bool
     var recurrence: BillRecurrence?
+    var recurrenceSeriesId: String?
+    var notificationAdvance: HouseReminderAdvance?
     
     
     init(
@@ -40,9 +43,12 @@ struct BillModel: Identifiable, Codable, Equatable {
         category: BillCategory = .other,
         createdByUserId: String,
         paidByUserId: String? = nil,
+        paidAt: Date? = nil,
         status: BillStatus = .upcoming,
         isRecurring: Bool = false,
-        recurrence: BillRecurrence? = nil
+        recurrence: BillRecurrence? = nil,
+        recurrenceSeriesId: String? = nil,
+        notificationAdvance: HouseReminderAdvance? = nil
     ) {
         self.billId = billId
         self.householdId = householdId
@@ -53,9 +59,12 @@ struct BillModel: Identifiable, Codable, Equatable {
         self.category = category
         self.createdByUserId = createdByUserId
         self.paidByUserId = paidByUserId
+        self.paidAt = paidAt
         self.status = status
         self.isRecurring = isRecurring
         self.recurrence = recurrence
+        self.recurrenceSeriesId = recurrenceSeriesId
+        self.notificationAdvance = notificationAdvance
     }
     
     
@@ -69,9 +78,12 @@ struct BillModel: Identifiable, Codable, Equatable {
         case category
         case createdByUserId = "created_by_user_id"
         case paidByUserId = "paid_by_user_id"
+        case paidAt = "paid_at"
         case status
         case isRecurring = "is_recurring"
         case recurrence
+        case recurrenceSeriesId = "recurrence_series_id"
+        case notificationAdvance = "notification_advance"
     }
     
     
@@ -87,9 +99,12 @@ struct BillModel: Identifiable, Codable, Equatable {
             "bill_\(CodingKeys.category.rawValue)": category.rawValue,
             "bill_\(CodingKeys.createdByUserId.rawValue)": createdByUserId,
             "bill_\(CodingKeys.paidByUserId.rawValue)": paidByUserId,
+            "bill_\(CodingKeys.paidAt.rawValue)": paidAt,
             "bill_\(CodingKeys.status.rawValue)": status.rawValue,
             "bill_\(CodingKeys.isRecurring.rawValue)": isRecurring,
-            "bill_\(CodingKeys.recurrence.rawValue)": recurrence?.rawValue
+            "bill_\(CodingKeys.recurrence.rawValue)": recurrence?.rawValue,
+            "bill_\(CodingKeys.recurrenceSeriesId.rawValue)": recurrenceSeriesId,
+            "bill_\(CodingKeys.notificationAdvance.rawValue)": notificationAdvance?.rawValue
         ]
         
         return dict.compactMapValues { $0 }

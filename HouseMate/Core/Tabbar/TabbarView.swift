@@ -8,29 +8,99 @@
 
 import SwiftUI
 
+@MainActor
 struct TabbarView: View {
+
+    private let interactor: CoreInteractor
+    private let household: HouseholdModel
+
+    var onSignOut: () -> Void = {}
 
     @State private var activeTab: CustomTab = .home
 
-    @State private var homeViewModel =
-        HomeViewModel()
+    @State private var homeViewModel: HomeViewModel
 
-    @State private var householdViewModel =
-        HouseholdViewModel()
+    @State private var householdViewModel: HouseholdViewModel
 
-    @State private var housematesViewModel =
-        HousematesViewModel()
+    @State private var housematesViewModel: HousematesViewModel
 
-    @State private var notificationsViewModel =
-        NotificationsViewModel()
+    @State private var notificationsViewModel: NotificationsViewModel
 
     @State private var activeSheet: TabbarSheet?
+    @State private var toast: AppToast?
+
+    init(
+        user: UserModel,
+        household: HouseholdModel,
+        members: [HouseholdMemberModel],
+        interactor: CoreInteractor,
+        onSignOut: @escaping () -> Void = {}
+    ) {
+        self.interactor = interactor
+        self.household = household
+        self.onSignOut = onSignOut
+
+        let householdUsers = members.map { member in
+            UserModel(
+                userId: member.userId,
+                name: member.displayName,
+                profileImageUrl: member.profileImageUrl,
+                householdId: household.householdId
+            )
+        }
+
+        _homeViewModel = State(
+            initialValue: HomeViewModel(
+                user: user,
+                members: members,
+                interactor: interactor
+            )
+        )
+
+        _householdViewModel = State(
+            initialValue: HouseholdViewModel(
+                currentUser: user,
+                members: members,
+                interactor: interactor
+            )
+        )
+
+        _housematesViewModel = State(
+            initialValue: HousematesViewModel(
+                currentUser: user,
+                users: householdUsers,
+                members: members,
+                householdOwnerUserID: household.createdByUserId,
+                interactor: interactor
+            )
+        )
+
+        _notificationsViewModel = State(
+            initialValue: NotificationsViewModel(
+                currentUserId: user.id,
+                interactor: interactor
+            )
+        )
+    }
+
+    init() {
+        let container = DependencyContainer.make(environment: .mock)
+        let interactor = CoreInteractor(container: container)
+
+        self.init(
+            user: UserModel.mockList[0],
+            household: .mock,
+            members: HouseholdMemberModel.mockList,
+            interactor: interactor
+        )
+    }
 
     var body: some View {
         TabView(selection: $activeTab) {
             Tab(value: .home) {
                 HomeView(
-                    viewModel: homeViewModel
+                    viewModel: homeViewModel,
+                    onSignOut: onSignOut
                 )
                 .customTabBarSafeArea()
             }
@@ -58,6 +128,32 @@ struct TabbarView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             sheetContent(for: sheet)
+        }
+        .overlay(alignment: .top) {
+            if let toast {
+                AppToastView(toast: toast)
+                    .padding(.top, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(100)
+                    .allowsHitTesting(false)
+            }
+        }
+        .task {
+            await notificationsViewModel.fetchNotifications()
+            await householdViewModel.refreshData()
+            await housematesViewModel.refreshData()
+
+            if let errorMessage = householdViewModel.actionState.errorMessage
+                ?? housematesViewModel.actionState.errorMessage {
+                showToast(
+                    message: errorMessage,
+                    systemImage: "exclamationmark.triangle.fill",
+                    color: .red
+                )
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .houseMateNotificationOpened)) { notification in
+            openSystemNotification(userInfo: notification.userInfo ?? [:])
         }
     }
 
@@ -384,18 +480,25 @@ struct TabbarView: View {
             assignedToUserId,
             dueDate,
             isAllDay,
-            category in
+            category,
+            notificationAdvance in
 
-            withAnimation {
-                householdViewModel.addChore(
+            performAction(
+                state: householdViewModel.actionState,
+                successMessage: "\(title) scheduled",
+                systemImage: "calendar.badge.plus",
+                operation: {
+                    await householdViewModel.addChore(
                     title: title,
                     description: description,
                     assignedToUserId: assignedToUserId,
                     dueDate: dueDate,
                     isAllDay: isAllDay,
-                    category: category
+                    category: category,
+                    notificationAdvance: notificationAdvance
                 )
-            }
+                }
+            )
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -403,12 +506,17 @@ struct TabbarView: View {
 
     private var shoppingItemSheet: some View {
         AddShoppingItemView { name, quantity in
-            withAnimation {
-                householdViewModel.addShoppingItem(
+            performAction(
+                state: householdViewModel.actionState,
+                successMessage: "\(name) added",
+                systemImage: "cart.badge.plus",
+                operation: {
+                    await householdViewModel.addShoppingItem(
                     name: name,
                     quantity: quantity
                 )
-            }
+                }
+            )
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
@@ -421,18 +529,25 @@ struct TabbarView: View {
             dueDate,
             category,
             isRecurring,
-            recurrence in
+            recurrence,
+            notificationAdvance in
 
-            withAnimation {
-                householdViewModel.addBill(
+            performAction(
+                state: householdViewModel.actionState,
+                successMessage: "\(title) added",
+                systemImage: "creditcard.fill",
+                operation: {
+                    await householdViewModel.addBill(
                     title: title,
                     amount: amount,
                     dueDate: dueDate,
                     category: category,
                     isRecurring: isRecurring,
-                    recurrence: recurrence
+                    recurrence: recurrence,
+                    notificationAdvance: notificationAdvance
                 )
-            }
+                }
+            )
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -455,11 +570,16 @@ struct TabbarView: View {
 
     private var postSheet: some View {
         AddBoardPostView { text in
-            withAnimation {
-                housematesViewModel.addPost(
+            performAction(
+                state: housematesViewModel.actionState,
+                successMessage: "Post added",
+                systemImage: "text.bubble.fill",
+                operation: {
+                    await housematesViewModel.addPost(
                     text: text
                 )
-            }
+                }
+            )
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
@@ -471,13 +591,18 @@ struct TabbarView: View {
             options,
             expiresAt in
 
-            withAnimation {
-                housematesViewModel.addPoll(
+            performAction(
+                state: housematesViewModel.actionState,
+                successMessage: "Poll created",
+                systemImage: "chart.bar.doc.horizontal",
+                operation: {
+                    await housematesViewModel.addPoll(
                     question: question,
                     options: options,
                     expiresAt: expiresAt
                 )
-            }
+                }
+            )
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -492,8 +617,12 @@ struct TabbarView: View {
             category,
             reminderAdvance in
 
-            withAnimation {
-                housematesViewModel.addReminder(
+            performAction(
+                state: housematesViewModel.actionState,
+                successMessage: "\(title) added",
+                systemImage: "bell.badge.fill",
+                operation: {
+                    await housematesViewModel.addReminder(
                     title: title,
                     details: details,
                     firstOccurrenceDate: firstOccurrenceDate,
@@ -501,10 +630,49 @@ struct TabbarView: View {
                     category: category,
                     reminderAdvance: reminderAdvance
                 )
-            }
+                }
+            )
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+    }
+
+    private func performAction(state: AsyncActionState, successMessage: String, systemImage: String, operation: @escaping @MainActor () async -> Bool) {
+        Task {
+            let succeeded = await operation()
+
+            showToast(
+                message: succeeded
+                    ? successMessage
+                    : state.errorMessage ?? "Something went wrong. Please try again.",
+                systemImage: succeeded ? systemImage : "exclamationmark.triangle.fill",
+                color: succeeded ? .green : .red
+            )
+        }
+    }
+
+    private func showToast(message: String, systemImage: String, color: Color) {
+        let newToast = AppToast(
+            message: message,
+            systemImage: systemImage,
+            color: color
+        )
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            toast = newToast
+        }
+
+        Task {
+            try? await Task.sleep(for: .seconds(2.2))
+
+            guard toast?.id == newToast.id else {
+                return
+            }
+
+            withAnimation(.easeOut(duration: 0.22)) {
+                toast = nil
+            }
+        }
     }
 
     // MARK: - Notification Navigation
@@ -529,6 +697,22 @@ struct TabbarView: View {
             case .housemates:
                 activeTab = .housemates
             }
+        }
+    }
+
+    private func openSystemNotification(userInfo: [AnyHashable: Any]) {
+        guard let rawDestination = userInfo["destination"] as? String,
+              let destination = NotificationDestination(rawValue: rawDestination) else {
+            return
+        }
+
+        activeSheet = nil
+
+        switch destination {
+        case .household:
+            activeTab = .houseHold
+        case .housemates:
+            activeTab = .housemates
         }
     }
 }

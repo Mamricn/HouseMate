@@ -12,6 +12,9 @@ struct HouseRemindersCardView: View {
 
     let reminders: [HouseReminderModel]
 
+    var currentUserId: String?
+    var householdOwnerUserId: String?
+
     var showsAddButton: Bool = true
 
     var onAdd: () -> Void = {}
@@ -81,7 +84,8 @@ struct HouseRemindersCardView: View {
                         edge: .leading,
                         allowsFullSwipe: false
                     ) {
-                        if onDelete != nil {
+                        if canDelete(reminder),
+                           onDelete != nil {
                             deleteButton(for: reminder)
                         }
                     }
@@ -176,6 +180,11 @@ struct HouseRemindersCardView: View {
                 systemImage: "trash.fill"
             )
         }
+    }
+
+    private func canDelete(_ reminder: HouseReminderModel) -> Bool {
+        reminder.createdByUserId == currentUserId
+            || currentUserId == householdOwnerUserId
     }
 
     // MARK: - Empty State

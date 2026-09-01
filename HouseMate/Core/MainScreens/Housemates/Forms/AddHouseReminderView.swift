@@ -134,10 +134,7 @@ struct AddHouseReminderView: View {
         } header: {
             Text("Notification")
         } footer: {
-            Text(
-                "Notifications will be enabled " +
-                "after Firebase and local notifications are connected."
-            )
+            Text("HouseMate will ask for notification permission when you add a reminder with notifications enabled.")
         }
     }
 

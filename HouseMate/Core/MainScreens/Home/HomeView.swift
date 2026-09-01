@@ -9,28 +9,50 @@
 import SwiftUI
 
 @Observable
+@MainActor
 final class HomeViewModel {
 
-    var user: UserModel =
-        UserModel.mockList[0]
+    var user: UserModel
 
-    var tasks: [TaskModel] =
-        TaskModel.mockList
+    private let interactor: CoreInteractor
+    let actionState = AsyncActionState()
 
-    var notes: [NoteModel] =
-        NoteModel.mockList
+    var tasks: [TaskModel] {
+        interactor.tasks
+    }
 
-    var shoppingItems: [ShoppingItemModel] =
-        ShoppingItemModel.mockList
+    var houseReminders: [HouseReminderModel] {
+        interactor.houseReminders
+    }
 
-    var bills: [BillModel] =
-        BillModel.mockList
+    var shoppingItems: [ShoppingItemModel] {
+        interactor.shoppingItems
+    }
 
-    var members: [HouseholdMemberModel] =
-        HouseholdMemberModel.mockList
+    var bills: [BillModel] {
+        interactor.bills
+    }
+
+    var members: [HouseholdMemberModel]
 
     private let calendar =
         Calendar.autoupdatingCurrent
+
+    init(user: UserModel, members: [HouseholdMemberModel], interactor: CoreInteractor) {
+        self.user = user
+        self.members = members
+        self.interactor = interactor
+    }
+
+    convenience init() {
+        let container = DependencyContainer.make(environment: .mock)
+
+        self.init(
+            user: UserModel.mockList[0],
+            members: HouseholdMemberModel.mockList,
+            interactor: CoreInteractor(container: container)
+        )
+    }
 
     // MARK: - User
 
@@ -74,39 +96,75 @@ final class HomeViewModel {
             }
     }
 
-    // MARK: - Recent Notes
+    // MARK: - Coming Up
 
-    var notesFromLastSevenDays: [NoteModel] {
-        let today = calendar.startOfDay(for: .now)
+    var comingUpItems: [ComingUpItem] {
+        let now = Date.now
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
 
-        guard
-            let sevenDaysAgo = calendar.date(
-                byAdding: .day,
-                value: -6,
-                to: today
-            ),
-            let tomorrow = calendar.date(
-                byAdding: .day,
-                value: 1,
-                to: today
+        let taskItems = tasks.compactMap { task -> ComingUpItem? in
+            guard task.status == .pending,
+                  task.assignedToUserId == user.id,
+                  let dueDate = task.dueDate,
+                  dueDate >= tomorrow else {
+                return nil
+            }
+
+            return ComingUpItem(
+                id: "task_\(task.id)",
+                title: task.title,
+                subtitle: "Your task",
+                date: dueDate,
+                systemImage: taskSystemImage(task.category),
+                kind: .task
             )
-        else {
-            return []
         }
 
-        return notes
-            .filter { note in
-                guard let createdAt = note.createdAt else {
-                    return false
-                }
+        let reminderItems = houseReminders.compactMap { reminder -> ComingUpItem? in
+            guard let nextDate = reminder.nextOccurrence(after: now) else {
+                return nil
+            }
 
-                return createdAt >= sevenDaysAgo
-                    && createdAt < tomorrow
-            }
-            .sorted {
-                ($0.createdAt ?? .distantPast)
-                    > ($1.createdAt ?? .distantPast)
-            }
+            return ComingUpItem(
+                id: "reminder_\(reminder.id)",
+                title: reminder.title,
+                subtitle: reminder.category.title,
+                date: nextDate,
+                systemImage: reminder.category.systemImage,
+                kind: .reminder
+            )
+        }
+
+        return Array(
+            (taskItems + reminderItems)
+                .sorted { $0.date < $1.date }
+                .prefix(4)
+        )
+    }
+
+    private func taskSystemImage(_ category: TaskCategory) -> String {
+        switch category {
+        case .cleaning:
+            return "sparkles"
+
+        case .kitchen:
+            return "fork.knife"
+
+        case .bathroom:
+            return "shower.fill"
+
+        case .laundry:
+            return "washer.fill"
+
+        case .trash:
+            return "trash.fill"
+
+        case .shopping:
+            return "cart.fill"
+
+        case .other:
+            return "checklist"
+        }
     }
 
     // MARK: - Recent Shopping Items
@@ -131,16 +189,26 @@ final class HomeViewModel {
 
         return shoppingItems
             .filter { item in
-                guard let createdAt = item.createdAt else {
+                let relevantDate = item.isPurchased
+                    ? item.purchasedAt ?? item.createdAt
+                    : item.createdAt
+
+                guard let relevantDate else {
                     return false
                 }
 
-                return createdAt >= yesterday
-                    && createdAt < tomorrow
+                return relevantDate >= yesterday
+                    && relevantDate < tomorrow
             }
             .sorted {
-                ($0.createdAt ?? .distantPast)
-                    > ($1.createdAt ?? .distantPast)
+                let firstDate = $0.isPurchased
+                    ? $0.purchasedAt ?? $0.createdAt
+                    : $0.createdAt
+                let secondDate = $1.isPurchased
+                    ? $1.purchasedAt ?? $1.createdAt
+                    : $1.createdAt
+
+                return (firstDate ?? .distantPast) > (secondDate ?? .distantPast)
             }
     }
 
@@ -175,62 +243,84 @@ final class HomeViewModel {
 
     // MARK: - Task Actions
 
-    func toggleTaskStatus(_ task: TaskModel) {
-        guard let index = tasks.firstIndex(where: {
-            $0.id == task.id
-        }) else {
-            return
+    func toggleTaskStatus(_ task: TaskModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.toggleTaskStatus(task)
         }
-
-        tasks[index].status =
-            tasks[index].status == .completed
-            ? .pending
-            : .completed
     }
 
     // MARK: - Shopping Actions
 
     func toggleShoppingItem(
         _ item: ShoppingItemModel
-    ) {
-        guard let index = shoppingItems.firstIndex(where: {
-            $0.id == item.id
-        }) else {
-            return
+    ) async -> Bool {
+        await actionState.perform {
+            try await interactor.toggleShoppingItemPurchased(item)
         }
-
-        shoppingItems[index].isPurchased.toggle()
     }
 
     // MARK: - Bill Actions
 
-    func markBillAsPaid(_ bill: BillModel) {
-        guard let index = bills.firstIndex(where: {
-            $0.id == bill.id
-        }) else {
+    func markBillAsPaid(_ bill: BillModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.markBillAsPaid(bill, paidByUserID: user.id)
+        }
+    }
+
+    func refreshData() async {
+        guard let householdID = user.householdId else {
             return
         }
 
-        bills[index].status = .paid
-        bills[index].paidByUserId = user.id
+        await actionState.capture {
+            try await interactor.fetchTasks(householdID: householdID, currentUserID: user.id)
+            try await interactor.fetchShoppingItems(householdID: householdID)
+            try await interactor.fetchBills(householdID: householdID)
+            try await interactor.fetchHouseReminders(householdID: householdID)
+        }
+    }
+
+    func applyNotificationPreferences() async {
+        await interactor.applyLocalNotificationPreferences()
+    }
+
+    func notificationAuthorizationStatus() async -> LocalNotificationAuthorizationStatus {
+        await interactor.localNotificationAuthorizationStatus()
+    }
+
+    func sendTestNotification() async -> Bool {
+        await actionState.perform {
+            try await interactor.sendTestNotification()
+        }
     }
 }
 
 struct HomeView: View {
 
     let viewModel: HomeViewModel
+    let onSignOut: () -> Void
+
     @State private var showsSettings = false
+    @State private var toast: AppToast?
 
     var body: some View {
         ZStack {
             backgroundGradient
             content
+            toastOverlay
         }
         .sheet(
             isPresented: $showsSettings
         ) {
             SettingsView(
-                user: viewModel.user
+                user: viewModel.user,
+                onSignOut: onSignOut,
+                onNotificationPreferencesChanged: {
+                    await viewModel.applyNotificationPreferences()
+                },
+                onSendTestNotification: {
+                    await viewModel.sendTestNotification()
+                }
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -247,13 +337,24 @@ struct HomeView: View {
             ) {
                 header
                 tasksCard
-                notesCard
+                comingUpCard
                 shoppingCard
                 billsCard
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
             .padding(.bottom, 35)
+        }
+        .refreshable {
+            await viewModel.refreshData()
+
+            if let errorMessage = viewModel.actionState.errorMessage {
+                showToast(
+                    message: errorMessage,
+                    systemImage: "exclamationmark.triangle.fill",
+                    color: .red
+                )
+            }
         }
         .scrollIndicators(.hidden)
     }
@@ -330,21 +431,29 @@ struct HomeView: View {
             members: viewModel.members,
             showsAddButton: false,
             onToggleStatus: { task in
-                withAnimation {
-                    viewModel.toggleTaskStatus(task)
-                }
+                performAction(
+                    successMessage: task.status == .completed
+                        ? "Task marked as pending"
+                        : "Task completed",
+                    systemImage: task.status == .completed
+                        ? "arrow.uturn.backward.circle"
+                        : "checkmark.circle.fill",
+                    color: task.status == .completed
+                        ? .orange
+                        : .green,
+                    operation: {
+                        await viewModel.toggleTaskStatus(task)
+                    }
+                )
             }
         )
         .dashboardShadow()
     }
 
-    // MARK: - Notes Card
+    // MARK: - Coming Up Card
 
-    private var notesCard: some View {
-        NotesCardView(
-            notes: viewModel.notesFromLastSevenDays,
-            showsAddButton: false
-        )
+    private var comingUpCard: some View {
+        ComingUpCardView(items: viewModel.comingUpItems)
         .dashboardShadow()
     }
 
@@ -355,9 +464,20 @@ struct HomeView: View {
             items: viewModel.recentShoppingItems,
             showsAddButton: false,
             onTogglePurchased: { item in
-                withAnimation {
-                    viewModel.toggleShoppingItem(item)
-                }
+                performAction(
+                    successMessage: item.isPurchased
+                        ? "\(item.name) added back"
+                        : "\(item.name) purchased",
+                    systemImage: item.isPurchased
+                        ? "arrow.uturn.backward.circle"
+                        : "cart.badge.checkmark",
+                    color: item.isPurchased
+                        ? .orange
+                        : .green,
+                    operation: {
+                        await viewModel.toggleShoppingItem(item)
+                    }
+                )
             }
         )
         .dashboardShadow()
@@ -371,12 +491,71 @@ struct HomeView: View {
             title: "Upcoming Bills",
             showsAddButton: false,
             onMarkAsPaid: { bill in
-                withAnimation {
-                    viewModel.markBillAsPaid(bill)
-                }
+                performAction(
+                    successMessage: "\(bill.title) marked as paid",
+                    systemImage: "checkmark.circle.fill",
+                    color: .green,
+                    operation: {
+                        await viewModel.markBillAsPaid(bill)
+                    }
+                )
             }
         )
         .dashboardShadow()
+    }
+
+    // MARK: - Toast
+
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if let toast {
+            VStack {
+                AppToastView(toast: toast)
+                    .transition(
+                        .move(edge: .top)
+                        .combined(with: .opacity)
+                    )
+
+                Spacer()
+            }
+            .padding(.top, 12)
+            .zIndex(100)
+            .allowsHitTesting(false)
+        }
+    }
+
+    private func showToast(message: String, systemImage: String, color: Color) {
+        let newToast = AppToast(
+            message: message,
+            systemImage: systemImage,
+            color: color
+        )
+
+        withAnimation(.spring(response: 0.4)) {
+            toast = newToast
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            guard toast?.id == newToast.id else { return }
+
+            withAnimation(.easeInOut(duration: 0.25)) {
+                toast = nil
+            }
+        }
+    }
+
+    private func performAction(successMessage: String, systemImage: String, color: Color, operation: @escaping @MainActor () async -> Bool) {
+        Task {
+            let succeeded = await operation()
+
+            showToast(
+                message: succeeded
+                    ? successMessage
+                    : viewModel.actionState.errorMessage ?? "Something went wrong. Please try again.",
+                systemImage: succeeded ? systemImage : "exclamationmark.triangle.fill",
+                color: succeeded ? color : .red
+            )
+        }
     }
 
     // MARK: - Background
@@ -430,6 +609,7 @@ private extension View {
 
 #Preview {
     HomeView(
-        viewModel: HomeViewModel()
+        viewModel: HomeViewModel(),
+        onSignOut: {}
     )
 }

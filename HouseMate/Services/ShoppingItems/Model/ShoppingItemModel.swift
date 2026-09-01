@@ -20,6 +20,7 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
     var quantity: Int
     var addedByUserId: String
     var isPurchased: Bool
+    var purchasedAt: Date?
     
     
     init(
@@ -29,7 +30,8 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
         name: String,
         quantity: Int = 1,
         addedByUserId: String,
-        isPurchased: Bool = false
+        isPurchased: Bool = false,
+        purchasedAt: Date? = nil
     ) {
         self.itemId = itemId
         self.householdId = householdId
@@ -38,6 +40,7 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
         self.quantity = quantity
         self.addedByUserId = addedByUserId
         self.isPurchased = isPurchased
+        self.purchasedAt = purchasedAt
     }
     
     
@@ -49,6 +52,7 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
         case quantity
         case addedByUserId = "added_by_user_id"
         case isPurchased = "is_purchased"
+        case purchasedAt = "purchased_at"
     }
     
     
@@ -61,7 +65,8 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
             "shopping_\(CodingKeys.name.rawValue)": name,
             "shopping_\(CodingKeys.quantity.rawValue)": quantity,
             "shopping_\(CodingKeys.addedByUserId.rawValue)": addedByUserId,
-            "shopping_\(CodingKeys.isPurchased.rawValue)": isPurchased
+            "shopping_\(CodingKeys.isPurchased.rawValue)": isPurchased,
+            "shopping_\(CodingKeys.purchasedAt.rawValue)": purchasedAt
         ]
         
         return dict.compactMapValues { $0 }

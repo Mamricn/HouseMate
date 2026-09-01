@@ -26,9 +26,17 @@ struct BillRowView: View {
                     .fontWeight(.medium)
                 
                 if let dueDate = bill.dueDate {
-                    Text(dueDate, format: .dateTime.day().month(.abbreviated))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text(dueDate, format: .dateTime.day().month(.abbreviated))
+
+                        if bill.status == .paid {
+                            statusLabel(title: "Paid", color: .green)
+                        } else if bill.status == .overdue {
+                            statusLabel(title: "Overdue", color: .red)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
             
@@ -38,6 +46,17 @@ struct BillRowView: View {
                 .font(.subheadline)
                 .fontWeight(.semibold)
         }
+    }
+
+    private func statusLabel(title: String, color: Color) -> some View {
+        Text(title)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
     }
 }
 #Preview("With Bills") {

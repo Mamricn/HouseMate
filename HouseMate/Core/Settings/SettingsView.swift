@@ -7,12 +7,21 @@
 
 
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     let user: UserModel
+    let onSignOut: () -> Void
+    var onNotificationPreferencesChanged: () async -> Void = {}
+    var onSendTestNotification: () async -> Bool = { false }
+
+#if DEVELOPMENT
+    @State private var isSendingTestNotification = false
+#endif
 
     @AppStorage("automaticWeeklyAssignment")
     private var automaticWeeklyAssignment = false
@@ -23,6 +32,9 @@ struct SettingsView: View {
     @AppStorage("houseReminderNotificationsEnabled")
     private var houseReminderNotificationsEnabled = true
 
+    @AppStorage("billNotificationsEnabled")
+    private var billNotificationsEnabled = true
+
     var body: some View {
         NavigationStack {
             Form {
@@ -30,6 +42,7 @@ struct SettingsView: View {
                 householdSection
                 notificationsSection
                 aboutSection
+                accountSection
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -120,8 +133,70 @@ struct SettingsView: View {
                 "House Reminders",
                 isOn: $houseReminderNotificationsEnabled
             )
+
+            Toggle(
+                "Bill Notifications",
+                isOn: $billNotificationsEnabled
+            )
+
+            Button {
+                openNotificationSettings()
+            } label: {
+                HStack {
+                    Text("System Permission")
+                        .foregroundStyle(.primary)
+
+                    Spacer()
+
+                    Text("Open Settings")
+                        .foregroundStyle(.blue)
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(.blue)
+                }
+            }
+
+#if DEVELOPMENT
+            Button {
+                sendTestNotification()
+            } label: {
+                if isSendingTestNotification {
+                    ProgressView().frame(maxWidth: .infinity)
+                } else {
+                    Text("Send Test Notification").frame(maxWidth: .infinity)
+                }
+            }
+            .disabled(isSendingTestNotification)
+#endif
+        }
+        .onChange(of: taskNotificationsEnabled) { _, _ in updateNotificationPreferences() }
+        .onChange(of: houseReminderNotificationsEnabled) { _, _ in updateNotificationPreferences() }
+        .onChange(of: billNotificationsEnabled) { _, _ in updateNotificationPreferences() }
+    }
+
+    private func updateNotificationPreferences() {
+        Task { await onNotificationPreferencesChanged() }
+    }
+
+    private func openNotificationSettings() {
+        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else {
+            return
+        }
+
+        openURL(url)
+    }
+
+#if DEVELOPMENT
+    private func sendTestNotification() {
+        isSendingTestNotification = true
+
+        Task {
+            _ = await onSendTestNotification()
+            isSendingTestNotification = false
         }
     }
+#endif
 
     // MARK: - About
 
@@ -143,6 +218,25 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Account
+
+    private var accountSection: some View {
+        Section("Account") {
+            Button {
+                dismiss()
+                onSignOut()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .foregroundStyle(.blue)
+
+                    Text("Sign Out")
+                        .foregroundStyle(.primary)
+                }
+            }
+        }
+    }
+
     private var appVersion: String {
         Bundle.main.infoDictionary?[
             "CFBundleShortVersionString"
@@ -154,6 +248,7 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView(
-        user: UserModel.mockList[0]
+        user: UserModel.mockList[0],
+        onSignOut: {}
     )
 }

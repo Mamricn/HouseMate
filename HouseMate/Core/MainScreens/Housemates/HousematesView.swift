@@ -9,25 +9,59 @@
 import SwiftUI
 
 @Observable
+@MainActor
 final class HousematesViewModel {
 
-    var currentUser: UserModel =
-        UserModel.mockList[0]
+    private let interactor: CoreInteractor
+    let actionState = AsyncActionState()
 
-    var users: [UserModel] =
-        UserModel.mockList
+    var currentUser: UserModel
 
-    var members: [HouseholdMemberModel] =
-        HouseholdMemberModel.mockList
+    var users: [UserModel]
 
-    var posts: [BoardPostModel] =
-        BoardPostModel.mockList
+    var members: [HouseholdMemberModel]
 
-    var polls: [PollModel] =
-        PollModel.mockList
+    let householdOwnerUserID: String
 
-    var reminders: [HouseReminderModel] =
-        HouseReminderModel.mockList
+    var posts: [BoardPostModel] {
+        interactor.boardPosts
+    }
+
+    var isLoadingMorePosts: Bool {
+        interactor.isLoadingMoreBoardPosts
+    }
+
+    var canLoadMorePosts: Bool {
+        interactor.canLoadMoreBoardPosts
+    }
+
+    var polls: [PollModel] {
+        interactor.polls
+    }
+
+    var reminders: [HouseReminderModel] {
+        interactor.houseReminders
+    }
+
+    init(currentUser: UserModel, users: [UserModel], members: [HouseholdMemberModel], householdOwnerUserID: String, interactor: CoreInteractor) {
+        self.currentUser = currentUser
+        self.users = users
+        self.members = members
+        self.householdOwnerUserID = householdOwnerUserID
+        self.interactor = interactor
+    }
+
+    convenience init() {
+        let container = DependencyContainer.make(environment: .mock)
+
+        self.init(
+            currentUser: UserModel.mockList[0],
+            users: UserModel.mockList,
+            members: HouseholdMemberModel.mockList,
+            householdOwnerUserID: HouseholdModel.mock.createdByUserId,
+            interactor: CoreInteractor(container: container)
+        )
+    }
 
     // MARK: - Housemate Actions
 
@@ -63,9 +97,9 @@ final class HousematesViewModel {
 
     // MARK: - Board Actions
 
-    func addPost(text: String) {
+    func addPost(text: String) async -> Bool {
         guard let householdId = currentUser.householdId else {
-            return
+            return false
         }
 
         let newPost = BoardPostModel(
@@ -77,12 +111,35 @@ final class HousematesViewModel {
             imageUrl: nil
         )
 
-        posts.append(newPost)
+        return await actionState.perform {
+            try await interactor.createBoardPost(newPost)
+        }
     }
 
-    func deletePost(_ post: BoardPostModel) {
-        posts.removeAll {
-            $0.id == post.id
+    func deletePost(_ post: BoardPostModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.deleteBoardPost(
+                post,
+                currentUserID: currentUser.id
+            )
+        }
+    }
+
+    func fetchInitialPosts() async {
+        guard let householdID = currentUser.householdId else {
+            return
+        }
+
+        await actionState.capture {
+            try await interactor.fetchInitialBoardPosts(householdID: householdID)
+        }
+    }
+
+    func loadMorePosts() {
+        Task {
+            await actionState.capture {
+                try await interactor.loadMoreBoardPosts()
+            }
         }
     }
 
@@ -92,9 +149,9 @@ final class HousematesViewModel {
         question: String,
         options: [String],
         expiresAt: Date?
-    ) {
+    ) async -> Bool {
         guard let householdId = currentUser.householdId else {
-            return
+            return false
         }
 
         let pollOptions = options.map { option in
@@ -116,43 +173,49 @@ final class HousematesViewModel {
             expiresAt: expiresAt
         )
 
-        polls.append(newPoll)
+        return await actionState.perform {
+            try await interactor.createPoll(newPoll)
+        }
     }
 
     func vote(
         in poll: PollModel,
         for option: PollOptionModel
-    ) {
-        guard let index = polls.firstIndex(where: {
-            $0.id == poll.id
-        }) else {
-            return
+    ) async -> Bool {
+        await actionState.perform {
+            try await interactor.vote(
+                in: poll,
+                option: option,
+                userID: currentUser.id
+            )
         }
-
-        polls[index]
-            .votesByUserId[currentUser.id] = option.id
     }
 
-    func closePoll(_ poll: PollModel) {
-        guard
-            poll.createdByUserId == currentUser.id,
-            let index = polls.firstIndex(where: {
-                $0.id == poll.id
-            })
-        else {
-            return
+    func closePoll(_ poll: PollModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.closePoll(
+                poll,
+                currentUserID: currentUser.id
+            )
         }
-
-        polls[index].status = .closed
     }
 
-    func deletePoll(_ poll: PollModel) {
-        guard poll.createdByUserId == currentUser.id else {
+    func deletePoll(_ poll: PollModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.deletePoll(
+                poll,
+                currentUserID: currentUser.id
+            )
+        }
+    }
+
+    func fetchPolls() async {
+        guard let householdID = currentUser.householdId else {
             return
         }
 
-        polls.removeAll {
-            $0.id == poll.id
+        await actionState.capture {
+            try await interactor.fetchPolls(householdID: householdID)
         }
     }
 
@@ -165,9 +228,9 @@ final class HousematesViewModel {
         recurrence: HouseReminderRecurrence,
         category: HouseReminderCategory,
         reminderAdvance: HouseReminderAdvance
-    ) {
+    ) async -> Bool {
         guard let householdId = currentUser.householdId else {
-            return
+            return false
         }
 
         let newReminder = HouseReminderModel(
@@ -183,14 +246,42 @@ final class HousematesViewModel {
             reminderAdvance: reminderAdvance
         )
 
-        reminders.append(newReminder)
+        return await actionState.perform {
+            try await interactor.createHouseReminder(newReminder)
+        }
     }
 
     func deleteReminder(
         _ reminder: HouseReminderModel
-    ) {
-        reminders.removeAll {
-            $0.id == reminder.id
+    ) async -> Bool {
+        await actionState.perform {
+            try await interactor.deleteHouseReminder(
+                reminder,
+                currentUserID: currentUser.id,
+                ownerUserID: householdOwnerUserID
+            )
+        }
+    }
+
+    func fetchReminders() async {
+        guard let householdID = currentUser.householdId else {
+            return
+        }
+
+        await actionState.capture {
+            try await interactor.fetchHouseReminders(householdID: householdID)
+        }
+    }
+
+    func refreshData() async {
+        guard let householdID = currentUser.householdId else {
+            return
+        }
+
+        await actionState.capture {
+            try await interactor.fetchInitialBoardPosts(householdID: householdID)
+            try await interactor.fetchPolls(householdID: householdID)
+            try await interactor.fetchHouseReminders(householdID: householdID)
         }
     }
 }
@@ -244,6 +335,17 @@ struct HousematesView: View {
             .padding(.top, 18)
             .padding(.bottom, 35)
         }
+        .refreshable {
+            await viewModel.refreshData()
+
+            if let errorMessage = viewModel.actionState.errorMessage {
+                showToast(
+                    message: errorMessage,
+                    systemImage: "exclamationmark.triangle.fill",
+                    color: .red
+                )
+            }
+        }
         .scrollIndicators(.hidden)
     }
 
@@ -293,15 +395,19 @@ struct HousematesView: View {
                 activeSheet = .post
             },
             onDelete: { post in
-                withAnimation {
-                    viewModel.deletePost(post)
-                }
-
-                showToast(
-                    message: "Post deleted",
+                performAction(
+                    successMessage: "Post deleted",
                     systemImage: "trash.fill",
-                    color: .red
+                    color: .red,
+                    operation: {
+                        await viewModel.deletePost(post)
+                    }
                 )
+            },
+            canLoadMore: viewModel.canLoadMorePosts,
+            isLoadingMore: viewModel.isLoadingMorePosts,
+            onLoadMore: {
+                viewModel.loadMorePosts()
             }
         )
         .housematesCardShadow()
@@ -319,39 +425,36 @@ struct HousematesView: View {
                 activeSheet = .poll
             },
             onVote: { poll, option in
-                withAnimation {
-                    viewModel.vote(
+                performAction(
+                    successMessage: "Vote submitted",
+                    systemImage: "checkmark.circle.fill",
+                    color: .green,
+                    operation: {
+                        await viewModel.vote(
                         in: poll,
                         for: option
                     )
-                }
-
-                showToast(
-                    message: "Vote submitted",
-                    systemImage: "checkmark.circle.fill",
-                    color: .green
+                    }
                 )
             },
             onClose: { poll in
-                withAnimation {
-                    viewModel.closePoll(poll)
-                }
-
-                showToast(
-                    message: "Poll closed",
+                performAction(
+                    successMessage: "Poll closed",
                     systemImage: "checkmark.circle",
-                    color: .orange
+                    color: .orange,
+                    operation: {
+                        await viewModel.closePoll(poll)
+                    }
                 )
             },
             onDelete: { poll in
-                withAnimation {
-                    viewModel.deletePoll(poll)
-                }
-
-                showToast(
-                    message: "Poll deleted",
+                performAction(
+                    successMessage: "Poll deleted",
                     systemImage: "trash.fill",
-                    color: .red
+                    color: .red,
+                    operation: {
+                        await viewModel.deletePoll(poll)
+                    }
                 )
             }
         )
@@ -363,19 +466,20 @@ struct HousematesView: View {
     private var remindersCard: some View {
         HouseRemindersCardView(
             reminders: viewModel.reminders,
+            currentUserId: viewModel.currentUser.id,
+            householdOwnerUserId: viewModel.householdOwnerUserID,
             showsAddButton: true,
             onAdd: {
                 activeSheet = .reminder
             },
             onDelete: { reminder in
-                withAnimation {
-                    viewModel.deleteReminder(reminder)
-                }
-
-                showToast(
-                    message: "\(reminder.title) deleted",
+                performAction(
+                    successMessage: "\(reminder.title) deleted",
                     systemImage: "trash.fill",
-                    color: .red
+                    color: .red,
+                    operation: {
+                        await viewModel.deleteReminder(reminder)
+                    }
                 )
             }
         )
@@ -424,14 +528,13 @@ struct HousematesView: View {
 
     private var postSheet: some View {
         AddBoardPostView { text in
-            withAnimation {
-                viewModel.addPost(text: text)
-            }
-
-            showToast(
-                message: "Post added",
+            performAction(
+                successMessage: "Post added",
                 systemImage: "text.bubble.fill",
-                color: .green
+                color: .green,
+                operation: {
+                    await viewModel.addPost(text: text)
+                }
             )
         }
         .presentationDetents([.medium])
@@ -444,18 +547,17 @@ struct HousematesView: View {
             options,
             expiresAt in
 
-            withAnimation {
-                viewModel.addPoll(
+            performAction(
+                successMessage: "Poll created",
+                systemImage: "chart.bar.doc.horizontal",
+                color: .green,
+                operation: {
+                    await viewModel.addPoll(
                     question: question,
                     options: options,
                     expiresAt: expiresAt
                 )
-            }
-
-            showToast(
-                message: "Poll created",
-                systemImage: "chart.bar.doc.horizontal",
-                color: .green
+                }
             )
         }
         .presentationDetents([.large])
@@ -471,8 +573,12 @@ struct HousematesView: View {
             category,
             reminderAdvance in
 
-            withAnimation {
-                viewModel.addReminder(
+            performAction(
+                successMessage: "\(title) added",
+                systemImage: "bell.badge.fill",
+                color: .green,
+                operation: {
+                    await viewModel.addReminder(
                     title: title,
                     details: details,
                     firstOccurrenceDate: firstOccurrenceDate,
@@ -480,12 +586,7 @@ struct HousematesView: View {
                     category: category,
                     reminderAdvance: reminderAdvance
                 )
-            }
-
-            showToast(
-                message: "\(title) added",
-                systemImage: "bell.badge.fill",
-                color: .green
+                }
             )
         }
         .presentationDetents([.large])
@@ -537,6 +638,20 @@ struct HousematesView: View {
             withAnimation(.easeInOut(duration: 0.25)) {
                 toast = nil
             }
+        }
+    }
+
+    private func performAction(successMessage: String, systemImage: String, color: Color, operation: @escaping @MainActor () async -> Bool) {
+        Task {
+            let succeeded = await operation()
+
+            showToast(
+                message: succeeded
+                    ? successMessage
+                    : viewModel.actionState.errorMessage ?? "Something went wrong. Please try again.",
+                systemImage: succeeded ? systemImage : "exclamationmark.triangle.fill",
+                color: succeeded ? color : .red
+            )
         }
     }
 

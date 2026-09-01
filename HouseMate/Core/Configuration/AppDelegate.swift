@@ -8,6 +8,7 @@
 
 import UIKit
 import FirebaseCore
+import UserNotifications
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
 
@@ -19,6 +20,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
 
         configureFirebase()
+        UNUserNotificationCenter.current().delegate = self
 
         return true
     }
@@ -45,5 +47,30 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
 
         FirebaseApp.configure(options: options)
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let userInfo = response.notification.request.content.userInfo
+
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: .houseMateNotificationOpened,
+                object: nil,
+                userInfo: userInfo
+            )
+        }
     }
 }

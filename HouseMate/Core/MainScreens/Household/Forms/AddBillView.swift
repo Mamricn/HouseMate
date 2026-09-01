@@ -17,7 +17,8 @@ struct AddBillView: View {
         _ dueDate: Date,
         _ category: BillCategory,
         _ isRecurring: Bool,
-        _ recurrence: BillRecurrence?
+        _ recurrence: BillRecurrence?,
+        _ notificationAdvance: HouseReminderAdvance
     ) -> Void
 
     @State private var title = ""
@@ -28,6 +29,7 @@ struct AddBillView: View {
 
     @State private var isRecurring = false
     @State private var recurrence: BillRecurrence = .monthly
+    @State private var notificationAdvance: HouseReminderAdvance = .none
 
     var body: some View {
         NavigationStack {
@@ -36,6 +38,7 @@ struct AddBillView: View {
                 dueDateSection
                 categorySection
                 recurrenceSection
+                notificationSection
             }
             .navigationTitle("Add Bill")
             .navigationBarTitleDisplayMode(.inline)
@@ -132,6 +135,16 @@ struct AddBillView: View {
         }
     }
 
+    private var notificationSection: some View {
+        Section("Notification") {
+            Picker("Notify", selection: $notificationAdvance) {
+                ForEach(HouseReminderAdvance.allCases, id: \.self) { advance in
+                    Text(advance.title).tag(advance)
+                }
+            }
+        }
+    }
+
     // MARK: - Toolbar
 
     private var cancellationToolbar: some ToolbarContent {
@@ -204,7 +217,8 @@ struct AddBillView: View {
             dueDate,
             category,
             isRecurring,
-            isRecurring ? recurrence : nil
+            isRecurring ? recurrence : nil,
+            notificationAdvance
         )
 
         dismiss()
@@ -267,7 +281,8 @@ struct AddBillView: View {
         dueDate,
         category,
         isRecurring,
-        recurrence in
+        recurrence,
+        notificationAdvance in
 
         print(title)
         print(amount)
@@ -275,5 +290,6 @@ struct AddBillView: View {
         print(category)
         print(isRecurring)
         print(recurrence?.rawValue ?? "None")
+        print(notificationAdvance.title)
     }
 }

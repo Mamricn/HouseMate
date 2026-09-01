@@ -28,6 +28,7 @@ struct TaskModel: Identifiable, Codable, Equatable {
 
     var status: TaskStatus
     var category: TaskCategory
+    var notificationAdvance: HouseReminderAdvance?
 
     init(
         taskId: String,
@@ -40,7 +41,8 @@ struct TaskModel: Identifiable, Codable, Equatable {
         dueDate: Date? = nil,
         isAllDay: Bool = false,
         status: TaskStatus = .pending,
-        category: TaskCategory = .other
+        category: TaskCategory = .other,
+        notificationAdvance: HouseReminderAdvance? = nil
     ) {
         self.taskId = taskId
         self.householdId = householdId
@@ -53,6 +55,7 @@ struct TaskModel: Identifiable, Codable, Equatable {
         self.isAllDay = isAllDay
         self.status = status
         self.category = category
+        self.notificationAdvance = notificationAdvance
     }
 
     enum CodingKeys: String, CodingKey {
@@ -67,6 +70,7 @@ struct TaskModel: Identifiable, Codable, Equatable {
         case isAllDay = "is_all_day"
         case status
         case category
+        case notificationAdvance = "notification_advance"
     }
 
     var eventParameters: [String: Any] {
@@ -81,7 +85,8 @@ struct TaskModel: Identifiable, Codable, Equatable {
             "task_\(CodingKeys.dueDate.rawValue)": dueDate,
             "task_\(CodingKeys.isAllDay.rawValue)": isAllDay,
             "task_\(CodingKeys.status.rawValue)": status.rawValue,
-            "task_\(CodingKeys.category.rawValue)": category.rawValue
+            "task_\(CodingKeys.category.rawValue)": category.rawValue,
+            "task_\(CodingKeys.notificationAdvance.rawValue)": notificationAdvance?.rawValue
         ]
 
         return dictionary.compactMapValues { $0 }

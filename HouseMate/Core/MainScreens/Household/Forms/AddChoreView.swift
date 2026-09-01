@@ -21,7 +21,8 @@ struct AddChoreView: View {
         _ assignedToUserId: String,
         _ dueDate: Date,
         _ isAllDay: Bool,
-        _ category: TaskCategory
+        _ category: TaskCategory,
+        _ notificationAdvance: HouseReminderAdvance
     ) -> Void
 
     @State private var title = ""
@@ -30,6 +31,7 @@ struct AddChoreView: View {
     @State private var dueDate: Date
     @State private var isAllDay = false
     @State private var category: TaskCategory = .cleaning
+    @State private var notificationAdvance: HouseReminderAdvance = .none
 
     init(
         members: [HouseholdMemberModel],
@@ -40,7 +42,8 @@ struct AddChoreView: View {
             _ assignedToUserId: String,
             _ dueDate: Date,
             _ isAllDay: Bool,
-            _ category: TaskCategory
+            _ category: TaskCategory,
+            _ notificationAdvance: HouseReminderAdvance
         ) -> Void
     ) {
         self.members = members
@@ -62,6 +65,7 @@ struct AddChoreView: View {
                 assignmentSection
                 scheduleSection
                 categorySection
+                notificationSection
             }
             .navigationTitle("Add Chore")
             .navigationBarTitleDisplayMode(.inline)
@@ -160,6 +164,16 @@ struct AddChoreView: View {
         }
     }
 
+    private var notificationSection: some View {
+        Section("Notification") {
+            Picker("Notify", selection: $notificationAdvance) {
+                ForEach(HouseReminderAdvance.allCases, id: \.self) { advance in
+                    Text(advance.title).tag(advance)
+                }
+            }
+        }
+    }
+
     // MARK: - Toolbar
 
     private var cancellationToolbar: some ToolbarContent {
@@ -224,7 +238,8 @@ struct AddChoreView: View {
             assignedToUserId,
             finalDueDate,
             isAllDay,
-            category
+            category,
+            notificationAdvance
         )
 
         dismiss()
@@ -299,7 +314,8 @@ struct AddChoreView: View {
         userId,
         dueDate,
         isAllDay,
-        category in
+        category,
+        notificationAdvance in
 
         print(title)
         print(description ?? "")
@@ -307,5 +323,6 @@ struct AddChoreView: View {
         print(dueDate)
         print(isAllDay)
         print(category)
+        print(notificationAdvance.title)
     }
 }

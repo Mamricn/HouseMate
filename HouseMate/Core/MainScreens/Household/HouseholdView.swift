@@ -8,23 +8,45 @@
 import SwiftUI
 
 @Observable
+@MainActor
 final class HouseholdViewModel {
+
+    private let interactor: CoreInteractor
+    let actionState = AsyncActionState()
 
     var selectedDate: Date = .now
 
-    var currentUser: UserModel = UserModel.mockList[0]
+    var currentUser: UserModel
 
-    var members: [HouseholdMemberModel] =
-        HouseholdMemberModel.mockList
+    var members: [HouseholdMemberModel]
 
-    var tasks: [TaskModel] =
-        TaskModel.mockList
+    var tasks: [TaskModel] {
+        interactor.tasks
+    }
 
-    var shoppingItems: [ShoppingItemModel] =
-        ShoppingItemModel.mockList
+    var shoppingItems: [ShoppingItemModel] {
+        interactor.shoppingItems
+    }
 
-    var bills: [BillModel] =
-        BillModel.mockList
+    var bills: [BillModel] {
+        interactor.bills
+    }
+
+    init(currentUser: UserModel, members: [HouseholdMemberModel], interactor: CoreInteractor) {
+        self.currentUser = currentUser
+        self.members = members
+        self.interactor = interactor
+    }
+
+    convenience init() {
+        let container = DependencyContainer.make(environment: .mock)
+
+        self.init(
+            currentUser: UserModel.mockList[0],
+            members: HouseholdMemberModel.mockList,
+            interactor: CoreInteractor(container: container)
+        )
+    }
 
     // MARK: - Task Actions
 
@@ -34,10 +56,11 @@ final class HouseholdViewModel {
         assignedToUserId: String,
         dueDate: Date,
         isAllDay: Bool,
-        category: TaskCategory
-    ) {
+        category: TaskCategory,
+        notificationAdvance: HouseReminderAdvance
+    ) async -> Bool {
         guard let householdId = currentUser.householdId else {
-            return
+            return false
         }
 
         let newTask = TaskModel(
@@ -51,28 +74,34 @@ final class HouseholdViewModel {
             dueDate: dueDate,
             isAllDay: isAllDay,
             status: .pending,
-            category: category
+            category: category,
+            notificationAdvance: notificationAdvance == .none ? nil : notificationAdvance
         )
 
-        tasks.append(newTask)
+        return await actionState.perform {
+            try await interactor.createTask(newTask)
+        }
     }
 
-    func toggleTaskStatus(_ task: TaskModel) {
-        guard let index = tasks.firstIndex(where: {
-            $0.id == task.id
-        }) else {
+    func toggleTaskStatus(_ task: TaskModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.toggleTaskStatus(task)
+        }
+    }
+
+    func deleteTask(_ task: TaskModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.deleteTask(task)
+        }
+    }
+
+    func fetchTasks() async {
+        guard let householdID = currentUser.householdId else {
             return
         }
 
-        tasks[index].status =
-            tasks[index].status == .completed
-            ? .pending
-            : .completed
-    }
-
-    func deleteTask(_ task: TaskModel) {
-        tasks.removeAll {
-            $0.id == task.id
+        await actionState.capture {
+            try await interactor.fetchTasks(householdID: householdID, currentUserID: currentUser.id)
         }
     }
 
@@ -81,9 +110,9 @@ final class HouseholdViewModel {
     func addShoppingItem(
         name: String,
         quantity: Int
-    ) {
+    ) async -> Bool {
         guard let householdId = currentUser.householdId else {
-            return
+            return false
         }
 
         let newItem = ShoppingItemModel(
@@ -96,32 +125,40 @@ final class HouseholdViewModel {
             isPurchased: false
         )
 
-        shoppingItems.append(newItem)
+        return await actionState.perform {
+            try await interactor.createShoppingItem(newItem)
+        }
     }
 
     func toggleShoppingItem(
         _ item: ShoppingItemModel
-    ) {
-        guard let index = shoppingItems.firstIndex(where: {
-            $0.id == item.id
-        }) else {
-            return
+    ) async -> Bool {
+        await actionState.perform {
+            try await interactor.toggleShoppingItemPurchased(item)
         }
-
-        shoppingItems[index].isPurchased.toggle()
     }
 
     func deleteShoppingItem(
         _ item: ShoppingItemModel
-    ) {
-        shoppingItems.removeAll {
-            $0.id == item.id
+    ) async -> Bool {
+        await actionState.perform {
+            try await interactor.deleteShoppingItem(item)
         }
     }
 
-    func clearPurchasedShoppingItems() {
-        shoppingItems.removeAll {
-            $0.isPurchased
+    func clearPurchasedShoppingItems() async -> Bool {
+        await actionState.perform {
+            try await interactor.clearPurchasedShoppingItems()
+        }
+    }
+
+    func fetchShoppingItems() async {
+        guard let householdID = currentUser.householdId else {
+            return
+        }
+
+        await actionState.capture {
+            try await interactor.fetchShoppingItems(householdID: householdID)
         }
     }
 
@@ -133,14 +170,17 @@ final class HouseholdViewModel {
         dueDate: Date,
         category: BillCategory,
         isRecurring: Bool,
-        recurrence: BillRecurrence?
-    ) {
+        recurrence: BillRecurrence?,
+        notificationAdvance: HouseReminderAdvance
+    ) async -> Bool {
         guard let householdId = currentUser.householdId else {
-            return
+            return false
         }
 
+        let billID = UUID().uuidString
+
         let newBill = BillModel(
-            billId: UUID().uuidString,
+            billId: billID,
             householdId: householdId,
             createdAt: .now,
             title: title,
@@ -151,26 +191,47 @@ final class HouseholdViewModel {
             paidByUserId: nil,
             status: .upcoming,
             isRecurring: isRecurring,
-            recurrence: recurrence
+            recurrence: recurrence,
+            recurrenceSeriesId: isRecurring ? billID : nil,
+            notificationAdvance: notificationAdvance == .none ? nil : notificationAdvance
         )
 
-        bills.append(newBill)
+        return await actionState.perform {
+            try await interactor.createBill(newBill)
+        }
     }
 
-    func markBillAsPaid(_ bill: BillModel) {
-        guard let index = bills.firstIndex(where: {
-            $0.id == bill.id
-        }) else {
+    func markBillAsPaid(_ bill: BillModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.markBillAsPaid(bill, paidByUserID: currentUser.id)
+        }
+    }
+
+    func deleteBill(_ bill: BillModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.deleteBill(bill)
+        }
+    }
+
+    func fetchBills() async {
+        guard let householdID = currentUser.householdId else {
             return
         }
 
-        bills[index].status = .paid
-        bills[index].paidByUserId = currentUser.id
+        await actionState.capture {
+            try await interactor.fetchBills(householdID: householdID)
+        }
     }
 
-    func deleteBill(_ bill: BillModel) {
-        bills.removeAll {
-            $0.id == bill.id
+    func refreshData() async {
+        guard let householdID = currentUser.householdId else {
+            return
+        }
+
+        await actionState.capture {
+            try await interactor.fetchTasks(householdID: householdID, currentUserID: currentUser.id)
+            try await interactor.fetchShoppingItems(householdID: householdID)
+            try await interactor.fetchBills(householdID: householdID)
         }
     }
 }
@@ -222,6 +283,17 @@ struct HouseholdView: View {
             .padding(.top, 18)
             .padding(.bottom, 35)
         }
+        .refreshable {
+            await viewModel.refreshData()
+
+            if let errorMessage = viewModel.actionState.errorMessage {
+                showToast(
+                    message: errorMessage,
+                    systemImage: "exclamationmark.triangle.fill",
+                    color: .red
+                )
+            }
+        }
         .scrollIndicators(.hidden)
     }
 
@@ -258,12 +330,8 @@ struct HouseholdView: View {
                 activeSheet = .chore
             },
             onToggleStatus: { task in
-                withAnimation {
-                    viewModel.toggleTaskStatus(task)
-                }
-
-                showToast(
-                    message: task.status == .completed
+                performAction(
+                    successMessage: task.status == .completed
                         ? "Chore marked as pending"
                         : "Chore completed",
                     systemImage: task.status == .completed
@@ -271,18 +339,20 @@ struct HouseholdView: View {
                         : "checkmark.circle.fill",
                     color: task.status == .completed
                         ? .orange
-                        : .green
+                        : .green,
+                    operation: {
+                        await viewModel.toggleTaskStatus(task)
+                    }
                 )
             },
             onDelete: { task in
-                withAnimation {
-                    viewModel.deleteTask(task)
-                }
-
-                showToast(
-                    message: "\(task.title) deleted",
+                performAction(
+                    successMessage: "\(task.title) deleted",
                     systemImage: "calendar.badge.minus",
-                    color: .red
+                    color: .red,
+                    operation: {
+                        await viewModel.deleteTask(task)
+                    }
                 )
             }
         )
@@ -299,12 +369,8 @@ struct HouseholdView: View {
                 activeSheet = .shoppingItem
             },
             onTogglePurchased: { item in
-                withAnimation {
-                    viewModel.toggleShoppingItem(item)
-                }
-
-                showToast(
-                    message: item.isPurchased
+                performAction(
+                    successMessage: item.isPurchased
                         ? "\(item.name) added back"
                         : "\(item.name) purchased",
                     systemImage: item.isPurchased
@@ -312,29 +378,30 @@ struct HouseholdView: View {
                         : "cart.badge.checkmark",
                     color: item.isPurchased
                         ? .orange
-                        : .green
+                        : .green,
+                    operation: {
+                        await viewModel.toggleShoppingItem(item)
+                    }
                 )
             },
             onDelete: { item in
-                withAnimation {
-                    viewModel.deleteShoppingItem(item)
-                }
-
-                showToast(
-                    message: "\(item.name) deleted",
+                performAction(
+                    successMessage: "\(item.name) deleted",
                     systemImage: "trash.fill",
-                    color: .red
+                    color: .red,
+                    operation: {
+                        await viewModel.deleteShoppingItem(item)
+                    }
                 )
             },
             onClearPurchased: {
-                withAnimation {
-                    viewModel.clearPurchasedShoppingItems()
-                }
-
-                showToast(
-                    message: "Purchased items cleared",
+                performAction(
+                    successMessage: "Purchased items cleared",
                     systemImage: "checkmark.circle.fill",
-                    color: .green
+                    color: .green,
+                    operation: {
+                        await viewModel.clearPurchasedShoppingItems()
+                    }
                 )
             }
         )
@@ -352,25 +419,23 @@ struct HouseholdView: View {
                 activeSheet = .bill
             },
             onMarkAsPaid: { bill in
-                withAnimation {
-                    viewModel.markBillAsPaid(bill)
-                }
-
-                showToast(
-                    message: "\(bill.title) marked as paid",
+                performAction(
+                    successMessage: "\(bill.title) marked as paid",
                     systemImage: "checkmark.circle.fill",
-                    color: .green
+                    color: .green,
+                    operation: {
+                        await viewModel.markBillAsPaid(bill)
+                    }
                 )
             },
             onDelete: { bill in
-                withAnimation {
-                    viewModel.deleteBill(bill)
-                }
-
-                showToast(
-                    message: "\(bill.title) deleted",
+                performAction(
+                    successMessage: "\(bill.title) deleted",
                     systemImage: "trash.fill",
-                    color: .red
+                    color: .red,
+                    operation: {
+                        await viewModel.deleteBill(bill)
+                    }
                 )
             }
         )
@@ -405,23 +470,24 @@ struct HouseholdView: View {
             assignedToUserId,
             dueDate,
             isAllDay,
-            category in
+            category,
+            notificationAdvance in
 
-            withAnimation {
-                viewModel.addChore(
+            performAction(
+                successMessage: "\(title) scheduled",
+                systemImage: "calendar.badge.plus",
+                color: .green,
+                operation: {
+                    await viewModel.addChore(
                     title: title,
                     description: description,
                     assignedToUserId: assignedToUserId,
                     dueDate: dueDate,
                     isAllDay: isAllDay,
-                    category: category
+                    category: category,
+                    notificationAdvance: notificationAdvance
                 )
-            }
-
-            showToast(
-                message: "\(title) scheduled",
-                systemImage: "calendar.badge.plus",
-                color: .green
+                }
             )
         }
         .presentationDetents([.large])
@@ -430,17 +496,16 @@ struct HouseholdView: View {
 
     private var shoppingItemSheet: some View {
         AddShoppingItemView { name, quantity in
-            withAnimation {
-                viewModel.addShoppingItem(
+            performAction(
+                successMessage: "\(name) added",
+                systemImage: "cart.badge.plus",
+                color: .green,
+                operation: {
+                    await viewModel.addShoppingItem(
                     name: name,
                     quantity: quantity
                 )
-            }
-
-            showToast(
-                message: "\(name) added",
-                systemImage: "cart.badge.plus",
-                color: .green
+                }
             )
         }
         .presentationDetents([.medium])
@@ -454,23 +519,24 @@ struct HouseholdView: View {
             dueDate,
             category,
             isRecurring,
-            recurrence in
+            recurrence,
+            notificationAdvance in
 
-            withAnimation {
-                viewModel.addBill(
+            performAction(
+                successMessage: "\(title) added",
+                systemImage: "creditcard.fill",
+                color: .green,
+                operation: {
+                    await viewModel.addBill(
                     title: title,
                     amount: amount,
                     dueDate: dueDate,
                     category: category,
                     isRecurring: isRecurring,
-                    recurrence: recurrence
+                    recurrence: recurrence,
+                    notificationAdvance: notificationAdvance
                 )
-            }
-
-            showToast(
-                message: "\(title) added",
-                systemImage: "creditcard.fill",
-                color: .green
+                }
             )
         }
         .presentationDetents([.large])
@@ -522,6 +588,20 @@ struct HouseholdView: View {
             withAnimation(.easeInOut(duration: 0.25)) {
                 toast = nil
             }
+        }
+    }
+
+    private func performAction(successMessage: String, systemImage: String, color: Color, operation: @escaping @MainActor () async -> Bool) {
+        Task {
+            let succeeded = await operation()
+
+            showToast(
+                message: succeeded
+                    ? successMessage
+                    : viewModel.actionState.errorMessage ?? "Something went wrong. Please try again.",
+                systemImage: succeeded ? systemImage : "exclamationmark.triangle.fill",
+                color: succeeded ? color : .red
+            )
         }
     }
 

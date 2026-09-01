@@ -7,61 +7,95 @@
 
 import SwiftUI
 
-@Observable
-class SelectViewModel {
-    
+enum OnboardingDestination: Hashable {
+    case createHome
+    case joinHome
 }
 
+@MainActor
+@Observable
+final class SelectViewModel {
 
+    private let interactor: CoreInteractor
+    private let user: UserModel
+    private let onHouseholdCompleted: (HouseholdModel) -> Void
 
+    init(interactor: CoreInteractor, user: UserModel, onHouseholdCompleted: @escaping (HouseholdModel) -> Void) {
+        self.interactor = interactor
+        self.user = user
+        self.onHouseholdCompleted = onHouseholdCompleted
+    }
+
+    func makeCreateHomeViewModel() -> CreateHomeViewModel {
+        CreateHomeViewModel(
+            interactor: interactor,
+            user: user,
+            onHouseholdCreated: onHouseholdCompleted
+        )
+    }
+
+    func makeJoinHomeViewModel() -> JoinHomeViewModel {
+        JoinHomeViewModel(
+            interactor: interactor,
+            user: user,
+            onHouseholdJoined: onHouseholdCompleted
+        )
+    }
+}
 
 struct SelectView: View {
-    
+
     @State var viewModel: SelectViewModel
-    
+    @State private var path: [OnboardingDestination] = []
+
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    .blue,
-                    .teal,
-                    .blue.opacity(0.08),
-                    .blue.opacity(0.002),
-                    .black.opacity(0.1)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            VStack(spacing: 30) {
-                
-                picture
-                
-                
-                text
-                buttons
+        NavigationStack(path: $path) {
+            ZStack {
+                background
+
+                VStack(spacing: 30) {
+                    picture
+                    text
+                    buttons
+                }
+                .padding(.horizontal, 10)
             }
-            .padding(.horizontal, 10)
+            .navigationBarBackButtonHidden()
+            .navigationDestination(for: OnboardingDestination.self) { destination in
+                destinationView(destination)
+            }
         }
     }
+
+    private var background: some View {
+        LinearGradient(
+            colors: [
+                .blue,
+                .teal,
+                .blue.opacity(0.08),
+                .blue.opacity(0.002),
+                .black.opacity(0.1)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
     private var picture: some View {
-        GeometryReader{ geo in
-            
+        GeometryReader { geometry in
             Image("house2")
                 .resizable()
                 .scaledToFit()
-                .frame(width: geo.size.width * 0.80)
+                .frame(width: geometry.size.width * 0.8)
                 .position(
-                    x: geo.size.width * 0.50,
-                    y: geo.size.height * 0.50
+                    x: geometry.size.width * 0.5,
+                    y: geometry.size.height * 0.5
                 )
-
-            
         }
         .frame(height: 300)
     }
-    
+
     private var text: some View {
         VStack(spacing: 8) {
             Text("Set up your home")
@@ -74,75 +108,78 @@ struct SelectView: View {
                 .multilineTextAlignment(.center)
         }
     }
-    
-    
-    
+
     private var buttons: some View {
         VStack(spacing: 16) {
-
-            Button {
-
-            } label: {
-                HStack(spacing: 16) {
-
-                    Image(systemName: "house")
-                        .font(.title2)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Create a new home")
-                            .font(.headline)
-
-                        Text("Set up a home and invite others")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(15)
-                .frame(maxWidth: .infinity)
-                
+            onboardingButton(
+                title: "Create a new home",
+                subtitle: "Set up a home and invite others",
+                systemImage: "house"
+            ) {
+                path.append(.createHome)
             }
-            .buttonStyle(.glass)
 
-
-            Button {
-
-            } label: {
-                HStack(spacing: 16) {
-
-                    Image(systemName: "person.2.fill")
-                        .font(.title2)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Join a home")
-                            .font(.headline)
-
-                        Text("Join using an invite code")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(15)
-                .frame(maxWidth: .infinity)
-//                .glassEffect()
+            onboardingButton(
+                title: "Join a home",
+                subtitle: "Join using an invite code",
+                systemImage: "person.2.fill"
+            ) {
+                path.append(.joinHome)
             }
-            .buttonStyle(.glass)
         }
         .padding(.horizontal, 24)
     }
+
+    private func onboardingButton(title: String, subtitle: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                Image(systemName: systemImage)
+                    .font(.title2)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.glass)
+    }
+
+    @ViewBuilder
+    private func destinationView(_ destination: OnboardingDestination) -> some View {
+        switch destination {
+        case .createHome:
+            CreateHomeView(viewModel: viewModel.makeCreateHomeViewModel())
+
+        case .joinHome:
+            JoinHomeView(viewModel: viewModel.makeJoinHomeViewModel())
+        }
+    }
 }
 
+#if MOCK
 #Preview {
-    SelectView(viewModel: SelectViewModel())
+    let container = DependencyContainer.make(environment: .mock)
+    let interactor = CoreInteractor(container: container)
+
+    SelectView(
+        viewModel: SelectViewModel(
+            interactor: interactor,
+            user: .mockNoHousehold,
+            onHouseholdCompleted: { _ in }
+        )
+    )
 }
+#endif

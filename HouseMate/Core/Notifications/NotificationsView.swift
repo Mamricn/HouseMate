@@ -9,18 +9,21 @@
 import SwiftUI
 
 @Observable
+@MainActor
 final class NotificationsViewModel {
 
-    var currentUserId: String
-    var notifications: [NotificationModel]
+    let currentUserId: String
+    let actionState = AsyncActionState()
 
-    init(
-        currentUserId: String = "1",
-        notifications: [NotificationModel] =
-            NotificationModel.mockList
-    ) {
+    private let interactor: CoreInteractor
+
+    init(currentUserId: String, interactor: CoreInteractor) {
         self.currentUserId = currentUserId
-        self.notifications = notifications
+        self.interactor = interactor
+    }
+
+    var notifications: [NotificationModel] {
+        interactor.notifications
     }
 
     var userNotifications: [NotificationModel] {
@@ -40,31 +43,27 @@ final class NotificationsViewModel {
         }.count
     }
 
-    func markAsRead(
-        _ notification: NotificationModel
-    ) {
-        guard let index = notifications.firstIndex(where: {
-            $0.id == notification.id
-        }) else {
-            return
-        }
-
-        notifications[index].isRead = true
-    }
-
-    func markAllAsRead() {
-        for index in notifications.indices
-        where notifications[index].recipientUserId
-            == currentUserId {
-            notifications[index].isRead = true
+    func fetchNotifications() async {
+        await actionState.capture {
+            try await interactor.fetchNotifications(userID: currentUserId)
         }
     }
 
-    func deleteNotification(
-        _ notification: NotificationModel
-    ) {
-        notifications.removeAll {
-            $0.id == notification.id
+    func markAsRead(_ notification: NotificationModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.markNotificationAsRead(notification, userID: currentUserId)
+        }
+    }
+
+    func markAllAsRead() async -> Bool {
+        await actionState.perform {
+            try await interactor.markAllNotificationsAsRead(userID: currentUserId)
+        }
+    }
+
+    func deleteNotification(_ notification: NotificationModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.deleteNotification(notification, userID: currentUserId)
         }
     }
 }
@@ -141,10 +140,8 @@ struct NotificationsView: View {
                 allowsFullSwipe: false
             ) {
                 Button(role: .destructive) {
-                    withAnimation {
-                        viewModel.deleteNotification(
-                            notification
-                        )
+                    Task {
+                        _ = await viewModel.deleteNotification(notification)
                     }
                 } label: {
                     Label(
@@ -187,8 +184,8 @@ struct NotificationsView: View {
     private func openNotification(
         _ notification: NotificationModel
     ) {
-        withAnimation {
-            viewModel.markAsRead(notification)
+        Task {
+            _ = await viewModel.markAsRead(notification)
         }
 
         onOpenNotification(notification)
@@ -213,8 +210,8 @@ struct NotificationsView: View {
                 placement: .confirmationAction
             ) {
                 Button("Read All") {
-                    withAnimation {
-                        viewModel.markAllAsRead()
+                    Task {
+                        _ = await viewModel.markAllAsRead()
                     }
                 }
             }
@@ -237,7 +234,12 @@ struct NotificationsView: View {
 // MARK: - Preview
 
 #Preview {
-    NotificationsView(
-        viewModel: NotificationsViewModel()
-    )
+    let container = DependencyContainer.make(environment: .mock)
+    let interactor = CoreInteractor(container: container)
+    let viewModel = NotificationsViewModel(currentUserId: "1", interactor: interactor)
+
+    NotificationsView(viewModel: viewModel)
+        .task {
+            await viewModel.fetchNotifications()
+        }
 }

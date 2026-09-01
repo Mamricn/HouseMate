@@ -19,6 +19,9 @@ struct HouseholdBoardCardView: View {
 
     var onAdd: () -> Void = {}
     var onDelete: (BoardPostModel) -> Void = { _ in }
+    var canLoadMore: Bool = false
+    var isLoadingMore: Bool = false
+    var onLoadMore: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -77,6 +80,13 @@ struct HouseholdBoardCardView: View {
                     )
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
+                    .onAppear {
+                        if post.id == sortedPosts.last?.id,
+                           canLoadMore,
+                           !isLoadingMore {
+                            onLoadMore()
+                        }
+                    }
 
                     // Użytkownik może usunąć tylko swój post
                     .swipeActions(
@@ -88,6 +98,16 @@ struct HouseholdBoardCardView: View {
                         }
                     }
                 }
+            }
+
+            if isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
         }
         .listStyle(.plain)

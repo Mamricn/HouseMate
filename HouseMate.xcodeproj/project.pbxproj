@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		EB04597B303DAEC90001EDB2 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = EB04597A303DAEC90001EDB2 /* FirebaseAuth */; };
 		EB04597D303DAEC90001EDB2 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = EB04597C303DAEC90001EDB2 /* FirebaseFirestore */; };
+		EB045985303DFAE80001EDB2 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = EB045984303DFAE80001EDB2 /* GoogleSignIn */; };
+		EB045987303DFAE80001EDB2 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EB045986303DFAE80001EDB2 /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,9 +36,22 @@
 		EB667BF430338A8E00B6611A /* HouseMateUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HouseMateUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EB045BD0303E0AD30001EDB2 /* Exceptions for "HouseMate" folder in "HouseMate" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = EB667BDC30338A8D00B6611A /* HouseMate */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		EB667BDF30338A8D00B6611A /* HouseMate */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EB045BD0303E0AD30001EDB2 /* Exceptions for "HouseMate" folder in "HouseMate" target */,
+			);
 			path = HouseMate;
 			sourceTree = "<group>";
 		};
@@ -59,6 +74,8 @@
 			files = (
 				EB04597B303DAEC90001EDB2 /* FirebaseAuth in Frameworks */,
 				EB04597D303DAEC90001EDB2 /* FirebaseFirestore in Frameworks */,
+				EB045985303DFAE80001EDB2 /* GoogleSignIn in Frameworks */,
+				EB045987303DFAE80001EDB2 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,6 +138,8 @@
 			packageProductDependencies = (
 				EB04597A303DAEC90001EDB2 /* FirebaseAuth */,
 				EB04597C303DAEC90001EDB2 /* FirebaseFirestore */,
+				EB045984303DFAE80001EDB2 /* GoogleSignIn */,
+				EB045986303DFAE80001EDB2 /* GoogleSignInSwift */,
 			);
 			productName = HouseMate;
 			productReference = EB667BDD30338A8D00B6611A /* HouseMate.app */;
@@ -206,6 +225,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				EB045979303DAEC90001EDB2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				EB045983303DFAE80001EDB2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EB667BDE30338A8D00B6611A /* Products */;
@@ -350,11 +370,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HouseMate/HouseMate.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GOOGLE_REVERSED_CLIENT_ID = "housemate-mock";
+				INFOPLIST_FILE = HouseMate/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -482,11 +505,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HouseMate/HouseMate.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GOOGLE_REVERSED_CLIENT_ID = "housemate-mock";
+				INFOPLIST_FILE = HouseMate/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -621,11 +647,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HouseMate/HouseMate.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.1018275940291-a0dgveijnagl4oqp8i4thpsrubsleg5l";
+				INFOPLIST_FILE = HouseMate/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -753,11 +782,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HouseMate/HouseMate.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.349801707175-enarnl6lq1mr24vgf5s145v0ei2kin9v";
+				INFOPLIST_FILE = HouseMate/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -949,11 +981,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HouseMate/HouseMate.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.349801707175-enarnl6lq1mr24vgf5s145v0ei2kin9v";
+				INFOPLIST_FILE = HouseMate/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -982,11 +1017,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HouseMate/HouseMate.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.1018275940291-a0dgveijnagl4oqp8i4thpsrubsleg5l";
+				INFOPLIST_FILE = HouseMate/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -1160,6 +1198,14 @@
 				minimumVersion = 12.18.0;
 			};
 		};
+		EB045983303DFAE80001EDB2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.2.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1172,6 +1218,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EB045979303DAEC90001EDB2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		EB045984303DFAE80001EDB2 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EB045983303DFAE80001EDB2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		EB045986303DFAE80001EDB2 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EB045983303DFAE80001EDB2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
