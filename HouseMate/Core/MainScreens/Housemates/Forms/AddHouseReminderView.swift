@@ -29,6 +29,7 @@ struct AddHouseReminderView: View {
     @State private var recurrence: HouseReminderRecurrence = .never
     @State private var category: HouseReminderCategory = .other
     @State private var reminderAdvance: HouseReminderAdvance = .none
+    @State private var hasAttemptedSubmit = false
 
     var body: some View {
         NavigationStack {
@@ -56,6 +57,10 @@ struct AddHouseReminderView: View {
                 text: $title
             )
             .textInputAutocapitalization(.sentences)
+
+            if hasAttemptedSubmit && trimmedTitle.isEmpty {
+                FormValidationMessage(message: "Enter a reminder title.")
+            }
 
             TextField(
                 "Details (optional)",
@@ -157,7 +162,6 @@ struct AddHouseReminderView: View {
             Button("Add") {
                 saveReminder()
             }
-            .disabled(trimmedTitle.isEmpty)
         }
     }
 
@@ -186,7 +190,10 @@ struct AddHouseReminderView: View {
     // MARK: - Save
 
     private func saveReminder() {
+        hasAttemptedSubmit = true
+
         guard !trimmedTitle.isEmpty else {
+            HapticFeedback.validationError()
             return
         }
 

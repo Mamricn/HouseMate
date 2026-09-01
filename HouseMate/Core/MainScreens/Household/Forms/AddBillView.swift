@@ -30,6 +30,7 @@ struct AddBillView: View {
     @State private var isRecurring = false
     @State private var recurrence: BillRecurrence = .monthly
     @State private var notificationAdvance: HouseReminderAdvance = .none
+    @State private var hasAttemptedSubmit = false
 
     var body: some View {
         NavigationStack {
@@ -59,6 +60,10 @@ struct AddBillView: View {
             )
             .textInputAutocapitalization(.sentences)
 
+            if hasAttemptedSubmit && trimmedTitle.isEmpty {
+                FormValidationMessage(message: "Enter a bill title.")
+            }
+
             HStack {
                 Text("£")
                     .foregroundStyle(.secondary)
@@ -68,6 +73,10 @@ struct AddBillView: View {
                     text: $amountText
                 )
                 .keyboardType(.decimalPad)
+            }
+
+            if hasAttemptedSubmit && !hasValidAmount {
+                FormValidationMessage(message: "Enter an amount greater than zero.")
             }
         }
     }
@@ -164,7 +173,6 @@ struct AddBillView: View {
             Button("Add") {
                 saveBill()
             }
-            .disabled(!canSave)
         }
     }
 
@@ -172,8 +180,11 @@ struct AddBillView: View {
 
     private var canSave: Bool {
         !trimmedTitle.isEmpty
-            && parsedAmount != nil
-            && (parsedAmount ?? 0) > 0
+            && hasValidAmount
+    }
+
+    private var hasValidAmount: Bool {
+        parsedAmount.map { $0 > 0 } ?? false
     }
 
     private var trimmedTitle: String {
@@ -204,10 +215,13 @@ struct AddBillView: View {
     // MARK: - Save
 
     private func saveBill() {
+        hasAttemptedSubmit = true
+
         guard
             canSave,
             let amount = parsedAmount
         else {
+            HapticFeedback.validationError()
             return
         }
 

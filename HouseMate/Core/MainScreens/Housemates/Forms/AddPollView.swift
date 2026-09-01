@@ -23,6 +23,7 @@ struct AddPollView: View {
     @State private var options = ["", ""]
 
     @State private var hasExpiryDate = false
+    @State private var hasAttemptedSubmit = false
     @State private var expiresAt =
         Calendar.autoupdatingCurrent.date(
             byAdding: .day,
@@ -57,6 +58,10 @@ struct AddPollView: View {
             )
             .lineLimit(2...4)
             .textInputAutocapitalization(.sentences)
+
+            if hasAttemptedSubmit && trimmedQuestion.isEmpty {
+                FormValidationMessage(message: "Enter a poll question.")
+            }
         }
     }
 
@@ -92,6 +97,10 @@ struct AddPollView: View {
                         systemImage: "plus.circle"
                     )
                 }
+            }
+
+            if hasAttemptedSubmit, let optionsValidationMessage {
+                FormValidationMessage(message: optionsValidationMessage)
             }
         } header: {
             Text("Options")
@@ -142,7 +151,6 @@ struct AddPollView: View {
             Button("Create") {
                 savePoll()
             }
-            .disabled(!canSave)
         }
     }
 
@@ -181,6 +189,18 @@ struct AddPollView: View {
             && hasUniqueOptions
     }
 
+    private var optionsValidationMessage: String? {
+        if trimmedOptions.count < 2 {
+            return "Enter at least two options."
+        }
+
+        if !hasUniqueOptions {
+            return "Each option must be unique."
+        }
+
+        return nil
+    }
+
     private var minimumExpiryDate: Date {
         Calendar.autoupdatingCurrent.date(
             byAdding: .minute,
@@ -200,7 +220,10 @@ struct AddPollView: View {
     }
 
     private func savePoll() {
+        hasAttemptedSubmit = true
+
         guard canSave else {
+            HapticFeedback.validationError()
             return
         }
 

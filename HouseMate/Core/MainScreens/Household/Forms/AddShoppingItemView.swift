@@ -13,6 +13,7 @@ struct AddShoppingItemView: View {
 
     @State private var itemName = ""
     @State private var quantity = 1
+    @State private var hasAttemptedSubmit = false
 
     let onSave: (
         _ name: String,
@@ -28,6 +29,10 @@ struct AddShoppingItemView: View {
                         text: $itemName
                     )
                     .textInputAutocapitalization(.sentences)
+
+                    if hasAttemptedSubmit && trimmedItemName.isEmpty {
+                        FormValidationMessage(message: "Enter an item name.")
+                    }
                 }
 
                 Section("Quantity") {
@@ -63,7 +68,6 @@ struct AddShoppingItemView: View {
                     Button("Add") {
                         saveItem()
                     }
-                    .disabled(trimmedItemName.isEmpty)
                 }
             }
         }
@@ -76,7 +80,10 @@ struct AddShoppingItemView: View {
     }
 
     private func saveItem() {
+        hasAttemptedSubmit = true
+
         guard !trimmedItemName.isEmpty else {
+            HapticFeedback.validationError()
             return
         }
 

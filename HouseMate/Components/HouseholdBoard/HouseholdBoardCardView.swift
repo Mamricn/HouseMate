@@ -97,6 +97,7 @@ struct HouseholdBoardCardView: View {
                             deleteButton(for: post)
                         }
                     }
+                    .roundedSwipeActions()
                 }
             }
 

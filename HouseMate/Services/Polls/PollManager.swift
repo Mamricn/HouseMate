@@ -41,6 +41,7 @@ final class PollManager {
 
     func vote(in poll: PollModel, option: PollOptionModel, userID: String) async throws {
         guard poll.status == .active,
+              poll.selectedOptionId(for: userID) != option.optionId,
               poll.options.contains(where: { $0.optionId == option.optionId }) else {
             return
         }

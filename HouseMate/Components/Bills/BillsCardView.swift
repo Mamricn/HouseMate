@@ -91,6 +91,7 @@ struct BillsCardView: View {
                             markAsPaidButton(for: bill)
                         }
                     }
+                    .roundedSwipeActions()
             }
         }
         .listStyle(.plain)

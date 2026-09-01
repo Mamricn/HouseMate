@@ -49,12 +49,6 @@ struct ComingUpCardView: View {
             Text("Coming Up")
                 .font(.title3)
                 .fontWeight(.semibold)
-
-            Spacer()
-
-            Image(systemName: "calendar.badge.clock")
-                .font(.headline)
-                .foregroundStyle(.blue)
         }
     }
 

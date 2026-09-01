@@ -188,6 +188,7 @@ struct ScheduleCardView: View {
                 ) {
                     toggleStatusButton(for: task)
                 }
+                .roundedSwipeActions()
             }
         }
         .listStyle(.plain)

@@ -17,6 +17,10 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
         database.collection("households")
     }
 
+    var updatesUserHouseholdAtomically: Bool {
+        true
+    }
+
     init(database: Firestore = Firestore.firestore()) {
         self.database = database
     }
@@ -62,6 +66,10 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             .collection("members")
             .document(owner.userId)
 
+        let userReference = database
+            .collection("users")
+            .document(owner.userId)
+
         let batch = database.batch()
 
         batch.setData(
@@ -72,6 +80,11 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
         batch.setData(
             memberData,
             forDocument: memberReference
+        )
+
+        batch.updateData(
+            ["household_id": household.householdId],
+            forDocument: userReference
         )
 
         try await batch.commit()
@@ -117,6 +130,10 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             .collection("members")
             .document(user.userId)
 
+        let userReference = database
+            .collection("users")
+            .document(user.userId)
+
         let batch = database.batch()
 
         batch.updateData(
@@ -132,6 +149,11 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             memberData,
             forDocument: memberReference,
             merge: true
+        )
+
+        batch.updateData(
+            ["household_id": household.householdId],
+            forDocument: userReference
         )
 
         try await batch.commit()
@@ -176,6 +198,37 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             .sorted {
                 ($0.joinedAt ?? .distantPast) < ($1.joinedAt ?? .distantPast)
             }
+    }
+
+    func observeMembers(
+        householdID: String,
+        onChange: @escaping (Result<[HouseholdMemberModel], Error>) -> Void
+    ) -> ServiceObservation? {
+        let listener = householdsCollection
+            .document(householdID)
+            .collection("members")
+            .order(by: "joined_at")
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    onChange(.failure(error))
+                    return
+                }
+
+                do {
+                    let members = try snapshot?.documents.map {
+                        try Firestore.Decoder().decode(
+                            HouseholdMemberModel.self,
+                            from: $0.data()
+                        )
+                    } ?? []
+
+                    onChange(.success(members))
+                } catch {
+                    onChange(.failure(error))
+                }
+            }
+
+        return ServiceObservation(cancellation: listener.remove)
     }
 
     private func makeUniqueInviteCode() async throws -> String {

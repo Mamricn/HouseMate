@@ -20,6 +20,7 @@ struct AddHousemateView: View {
 
     @State private var name = ""
     @State private var email = ""
+    @State private var hasAttemptedSubmit = false
 
     var body: some View {
         NavigationStack {
@@ -32,6 +33,10 @@ struct AddHousemateView: View {
                     .textContentType(.name)
                     .textInputAutocapitalization(.words)
 
+                    if hasAttemptedSubmit && trimmedName.isEmpty {
+                        FormValidationMessage(message: "Enter the housemate’s name.")
+                    }
+
                     TextField(
                         "Email",
                         text: $email
@@ -40,6 +45,10 @@ struct AddHousemateView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.emailAddress)
+
+                    if hasAttemptedSubmit && !hasValidEmail {
+                        FormValidationMessage(message: "Enter a valid email address.")
+                    }
                 } header: {
                     Text("Housemate")
                 } footer: {
@@ -77,7 +86,6 @@ struct AddHousemateView: View {
             Button("Invite") {
                 inviteHousemate()
             }
-            .disabled(!canInvite)
         }
     }
 
@@ -99,14 +107,21 @@ struct AddHousemateView: View {
 
     private var canInvite: Bool {
         !trimmedName.isEmpty
-            && trimmedEmail.contains("@")
+            && hasValidEmail
+    }
+
+    private var hasValidEmail: Bool {
+        trimmedEmail.contains("@")
             && trimmedEmail.contains(".")
     }
 
     // MARK: - Invite
 
     private func inviteHousemate() {
+        hasAttemptedSubmit = true
+
         guard canInvite else {
+            HapticFeedback.validationError()
             return
         }
 

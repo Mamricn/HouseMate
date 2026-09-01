@@ -22,8 +22,12 @@ final class JoinHomeViewModel {
 
     let codeLength = 6
 
+    var hasValidInviteCode: Bool {
+        inviteCode.count == codeLength
+    }
+
     var canJoinHome: Bool {
-        inviteCode.count == codeLength && !isLoading
+        hasValidInviteCode && !isLoading
     }
 
     init(interactor: CoreInteractor, user: UserModel, onHouseholdJoined: @escaping (HouseholdModel) -> Void) {
@@ -63,6 +67,7 @@ final class JoinHomeViewModel {
 struct JoinHomeView: View {
 
     @State var viewModel: JoinHomeViewModel
+    @State private var hasAttemptedSubmit = false
     @FocusState private var isCodeFocused: Bool
 
     var body: some View {
@@ -172,11 +177,25 @@ struct JoinHomeView: View {
                     isCodeFocused = true
                 }
             }
+
+            if hasAttemptedSubmit && !viewModel.hasValidInviteCode {
+                FormValidationMessage(
+                    message: "Enter the complete \(viewModel.codeLength)-character invite code."
+                )
+            }
         }
     }
 
     private var joinButton: some View {
         Button {
+            hasAttemptedSubmit = true
+
+            guard viewModel.hasValidInviteCode else {
+                HapticFeedback.validationError()
+                isCodeFocused = true
+                return
+            }
+
             Task {
                 await viewModel.joinHome()
             }
@@ -196,8 +215,8 @@ struct JoinHomeView: View {
             .glassEffect()
         }
         .buttonStyle(.plain)
-        .disabled(!viewModel.canJoinHome)
-        .opacity(viewModel.canJoinHome ? 1 : 0.5)
+        .disabled(viewModel.isLoading)
+        .opacity(viewModel.isLoading ? 0.7 : 1)
     }
 
     private func character(at index: Int) -> String {

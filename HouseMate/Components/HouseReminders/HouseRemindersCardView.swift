@@ -89,6 +89,7 @@ struct HouseRemindersCardView: View {
                             deleteButton(for: reminder)
                         }
                     }
+                    .roundedSwipeActions()
             }
         }
         .listStyle(.plain)

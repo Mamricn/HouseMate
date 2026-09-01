@@ -32,6 +32,7 @@ struct AddChoreView: View {
     @State private var isAllDay = false
     @State private var category: TaskCategory = .cleaning
     @State private var notificationAdvance: HouseReminderAdvance = .none
+    @State private var hasAttemptedSubmit = false
 
     init(
         members: [HouseholdMemberModel],
@@ -86,6 +87,10 @@ struct AddChoreView: View {
             )
             .textInputAutocapitalization(.sentences)
 
+            if hasAttemptedSubmit && trimmedTitle.isEmpty {
+                FormValidationMessage(message: "Enter a chore title.")
+            }
+
             TextField(
                 "Description (optional)",
                 text: $description,
@@ -103,6 +108,10 @@ struct AddChoreView: View {
             if members.isEmpty {
                 Text("No household members")
                     .foregroundStyle(.secondary)
+
+                if hasAttemptedSubmit {
+                    FormValidationMessage(message: "Add a household member before creating a chore.")
+                }
             } else {
                 Picker(
                     "Housemate",
@@ -193,7 +202,6 @@ struct AddChoreView: View {
             Button("Add") {
                 saveChore()
             }
-            .disabled(!canSave)
         }
     }
 
@@ -222,7 +230,10 @@ struct AddChoreView: View {
     // MARK: - Save
 
     private func saveChore() {
+        hasAttemptedSubmit = true
+
         guard canSave else {
+            HapticFeedback.validationError()
             return
         }
 

@@ -31,6 +31,7 @@ struct ShoppingItemRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .frame(minHeight: 40)
     }
 }
 

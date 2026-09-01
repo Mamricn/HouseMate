@@ -97,6 +97,7 @@ struct TaskCardView: View {
                         : .green
                 )
             }
+            .roundedSwipeActions()
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)

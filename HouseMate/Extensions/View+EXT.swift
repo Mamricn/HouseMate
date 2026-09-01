@@ -29,4 +29,14 @@ extension View {
             .blur(radius: status ? 0 : 10)
             .opacity(status ? 1 : 0)
     }
+
+    func roundedSwipeActions(cornerRadius: CGFloat = 22) -> some View {
+        let shape = RoundedRectangle(
+            cornerRadius: cornerRadius,
+            style: .continuous
+        )
+
+        return containerShape(shape)
+            .clipShape(shape)
+    }
 }

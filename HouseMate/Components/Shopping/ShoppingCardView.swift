@@ -94,9 +94,9 @@ struct ShoppingCardView: View {
                 ShoppingItemRowView(item: item)
                     .listRowInsets(
                         EdgeInsets(
-                            top: 2,
+                            top: 4,
                             leading: 0,
-                            bottom: 2,
+                            bottom: 4,
                             trailing: 0
                         )
                     )
@@ -112,6 +112,7 @@ struct ShoppingCardView: View {
                             deleteButton(for: item)
                         }
                     }
+                
 
                     // Purchased po prawej
                     .swipeActions(
@@ -120,6 +121,7 @@ struct ShoppingCardView: View {
                     ) {
                         togglePurchasedButton(for: item)
                     }
+                    .roundedSwipeActions()
             }
         }
         .listStyle(.plain)

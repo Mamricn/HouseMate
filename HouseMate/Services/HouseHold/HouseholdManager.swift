@@ -23,6 +23,8 @@ final class HouseholdManager {
 
     private(set) var currentMembers: [HouseholdMemberModel] = []
 
+    private var membersObservation: ServiceObservation?
+
     init(householdService: any HouseholdServiceProtocol, userService: any UserServiceProtocol) {
         self.householdService = householdService
         self.userService = userService
@@ -36,12 +38,15 @@ final class HouseholdManager {
                 owner: owner
             )
 
-        try await userService.updateHouseholdID(
-            household.householdId,
-            for: owner.userId
-        )
+        if !householdService.updatesUserHouseholdAtomically {
+            try await userService.updateHouseholdID(
+                household.householdId,
+                for: owner.userId
+            )
+        }
 
         currentHousehold = household
+        startObservingMembers(householdID: household.householdId)
         currentMembers = await membersAfterOnboarding(
             householdID: household.householdId,
             fallbackUser: owner
@@ -58,12 +63,15 @@ final class HouseholdManager {
                 user: user
             )
 
-        try await userService.updateHouseholdID(
-            household.householdId,
-            for: user.userId
-        )
+        if !householdService.updatesUserHouseholdAtomically {
+            try await userService.updateHouseholdID(
+                household.householdId,
+                for: user.userId
+            )
+        }
 
         currentHousehold = household
+        startObservingMembers(householdID: household.householdId)
         currentMembers = await membersAfterOnboarding(
             householdID: household.householdId,
             fallbackUser: user
@@ -82,10 +90,13 @@ final class HouseholdManager {
         currentHousehold = household
 
         if household != nil {
+            startObservingMembers(householdID: householdID)
             currentMembers = try await householdService.fetchMembers(
                 householdID: householdID
             )
         } else {
+            membersObservation?.cancel()
+            membersObservation = nil
             currentMembers = []
         }
 
@@ -93,8 +104,23 @@ final class HouseholdManager {
     }
 
     func clearCurrentHousehold() {
+        membersObservation?.cancel()
+        membersObservation = nil
         currentHousehold = nil
         currentMembers = []
+    }
+
+    private func startObservingMembers(householdID: String) {
+        membersObservation?.cancel()
+        membersObservation = householdService.observeMembers(
+            householdID: householdID
+        ) { [weak self] result in
+            guard case .success(let members) = result else {
+                return
+            }
+
+            self?.currentMembers = members
+        }
     }
 
     private func membersAfterOnboarding(householdID: String, fallbackUser: UserModel) async -> [HouseholdMemberModel] {

@@ -150,6 +150,7 @@ struct NotificationsView: View {
                     )
                 }
             }
+            .roundedSwipeActions()
         }
     }
 

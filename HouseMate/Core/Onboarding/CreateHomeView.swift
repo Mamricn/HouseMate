@@ -20,8 +20,12 @@ final class CreateHomeViewModel {
     private let user: UserModel
     private let onHouseholdCreated: (HouseholdModel) -> Void
 
+    var hasValidHomeName: Bool {
+        !homeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var canCreateHome: Bool {
-        !homeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isLoading
+        hasValidHomeName && !isLoading
     }
 
     init(interactor: CoreInteractor, user: UserModel, onHouseholdCreated: @escaping (HouseholdModel) -> Void) {
@@ -53,6 +57,8 @@ final class CreateHomeViewModel {
 struct CreateHomeView: View {
 
     @State var viewModel: CreateHomeViewModel
+    @State private var hasAttemptedSubmit = false
+    @FocusState private var isHomeNameFocused: Bool
 
     var body: some View {
         ZStack {
@@ -131,17 +137,30 @@ struct CreateHomeView: View {
                 .foregroundStyle(.secondary)
 
             TextField("e.g. London Flat", text: $viewModel.homeName)
+                .focused($isHomeNameFocused)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .submitLabel(.done)
                 .padding()
                 .glassEffect()
                 .disabled(viewModel.isLoading)
+
+            if hasAttemptedSubmit && !viewModel.hasValidHomeName {
+                FormValidationMessage(message: "Enter a name for your home.")
+            }
         }
     }
 
     private var createHomeButton: some View {
         Button {
+            hasAttemptedSubmit = true
+
+            guard viewModel.hasValidHomeName else {
+                HapticFeedback.validationError()
+                isHomeNameFocused = true
+                return
+            }
+
             Task {
                 await viewModel.createHome()
             }
@@ -159,8 +178,8 @@ struct CreateHomeView: View {
             .glassEffect()
         }
         .buttonStyle(.plain)
-        .disabled(!viewModel.canCreateHome)
-        .opacity(viewModel.canCreateHome ? 1 : 0.5)
+        .disabled(viewModel.isLoading)
+        .opacity(viewModel.isLoading ? 0.7 : 1)
     }
 
     private var errorBinding: Binding<Bool> {

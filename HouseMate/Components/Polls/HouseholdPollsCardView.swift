@@ -178,6 +178,10 @@ struct HouseholdPollsCardView: View {
         )
 
         return Button {
+            guard !isSelected else {
+                return
+            }
+
             onVote(
                 poll,
                 option
@@ -309,8 +313,9 @@ struct HouseholdPollsCardView: View {
             Image(systemName: "ellipsis")
                 .font(.headline)
                 .frame(width: 32, height: 32)
-                .contentShape(Rectangle())
+                .contentShape(Circle())
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Empty State

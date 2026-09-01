@@ -15,6 +15,7 @@ struct AddBoardPostView: View {
     let onSave: (_ text: String) -> Void
 
     @State private var text = ""
+    @State private var hasAttemptedSubmit = false
 
     private let maximumCharacters = 500
 
@@ -31,6 +32,10 @@ struct AddBoardPostView: View {
                     .textInputAutocapitalization(.sentences)
                     .onChange(of: text) {
                         limitTextLength()
+                    }
+
+                    if hasAttemptedSubmit && trimmedText.isEmpty {
+                        FormValidationMessage(message: "Enter a message before publishing.")
                     }
 
                     HStack {
@@ -76,7 +81,6 @@ struct AddBoardPostView: View {
             Button("Post") {
                 savePost()
             }
-            .disabled(trimmedText.isEmpty)
         }
     }
 
@@ -99,7 +103,10 @@ struct AddBoardPostView: View {
     }
 
     private func savePost() {
+        hasAttemptedSubmit = true
+
         guard !trimmedText.isEmpty else {
+            HapticFeedback.validationError()
             return
         }
 

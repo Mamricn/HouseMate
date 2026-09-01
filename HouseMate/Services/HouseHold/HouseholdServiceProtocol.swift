@@ -10,6 +10,8 @@ import Foundation
 @MainActor
 protocol HouseholdServiceProtocol: AnyObject {
 
+    var updatesUserHouseholdAtomically: Bool { get }
+
     func createHousehold(name: String, owner: UserModel) async throws -> HouseholdModel
 
     func joinHousehold(inviteCode: String, user: UserModel) async throws -> HouseholdModel
@@ -17,6 +19,25 @@ protocol HouseholdServiceProtocol: AnyObject {
     func fetchHousehold(householdID: String) async throws -> HouseholdModel?
 
     func fetchMembers(householdID: String) async throws -> [HouseholdMemberModel]
+
+    func observeMembers(
+        householdID: String,
+        onChange: @escaping (Result<[HouseholdMemberModel], Error>) -> Void
+    ) -> ServiceObservation?
+}
+
+extension HouseholdServiceProtocol {
+
+    var updatesUserHouseholdAtomically: Bool {
+        false
+    }
+
+    func observeMembers(
+        householdID: String,
+        onChange: @escaping (Result<[HouseholdMemberModel], Error>) -> Void
+    ) -> ServiceObservation? {
+        nil
+    }
 }
 
 enum HouseholdServiceError: LocalizedError {
