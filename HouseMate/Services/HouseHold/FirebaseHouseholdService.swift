@@ -112,6 +112,10 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             throw HouseholdServiceError.householdNotFound
         }
 
+        guard document.data()["deletion_state"] == nil else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
         var household = try Firestore.Decoder().decode(
             HouseholdModel.self,
             from: document.data()
@@ -200,6 +204,221 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             }
     }
 
+    func removeMember(
+        householdID: String,
+        memberUserID: String,
+        requestedByUserID: String
+    ) async throws {
+        let householdReference = householdsCollection.document(
+            householdID
+        )
+        let snapshot = try await householdReference.getDocument()
+
+        guard snapshot.exists,
+              let data = snapshot.data()
+        else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        let household = try Firestore.Decoder().decode(
+            HouseholdModel.self,
+            from: data
+        )
+
+        guard household.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        guard memberUserID != household.ownerUserId else {
+            throw HouseholdServiceError.ownerCannotBeRemoved
+        }
+
+        guard household.memberIds.contains(memberUserID) else {
+            throw HouseholdServiceError.memberNotFound
+        }
+
+        let memberReference = householdReference
+            .collection("members")
+            .document(memberUserID)
+        let userReference = database
+            .collection("users")
+            .document(memberUserID)
+        let batch = database.batch()
+
+        batch.updateData(
+            [
+                "member_ids": FieldValue.arrayRemove([
+                    memberUserID
+                ])
+            ],
+            forDocument: householdReference
+        )
+        batch.deleteDocument(memberReference)
+        batch.updateData(
+            ["household_id": FieldValue.delete()],
+            forDocument: userReference
+        )
+
+        try await batch.commit()
+    }
+
+    func transferOwnership(
+        householdID: String,
+        newOwnerUserID: String,
+        requestedByUserID: String
+    ) async throws {
+        let householdReference = householdsCollection.document(
+            householdID
+        )
+        let snapshot = try await householdReference.getDocument()
+
+        guard snapshot.exists,
+              let data = snapshot.data()
+        else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        let household = try Firestore.Decoder().decode(
+            HouseholdModel.self,
+            from: data
+        )
+
+        guard household.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        guard newOwnerUserID != requestedByUserID,
+              household.memberIds.contains(newOwnerUserID)
+        else {
+            throw HouseholdServiceError.memberNotFound
+        }
+
+        try await householdReference.updateData([
+            "owner_user_id": newOwnerUserID
+        ])
+    }
+
+    func leaveHousehold(
+        householdID: String,
+        userID: String
+    ) async throws {
+        let householdReference = householdsCollection.document(
+            householdID
+        )
+        let snapshot = try await householdReference.getDocument()
+
+        guard snapshot.exists,
+              let data = snapshot.data()
+        else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        let household = try Firestore.Decoder().decode(
+            HouseholdModel.self,
+            from: data
+        )
+
+        guard !household.isOwner(userID: userID) else {
+            throw HouseholdServiceError.ownershipTransferRequired
+        }
+
+        guard household.memberIds.contains(userID) else {
+            throw HouseholdServiceError.memberNotFound
+        }
+
+        let batch = database.batch()
+
+        batch.updateData(
+            ["member_ids": FieldValue.arrayRemove([userID])],
+            forDocument: householdReference
+        )
+        batch.deleteDocument(
+            householdReference
+                .collection("members")
+                .document(userID)
+        )
+        batch.updateData(
+            ["household_id": FieldValue.delete()],
+            forDocument: database
+                .collection("users")
+                .document(userID)
+        )
+
+        try await batch.commit()
+    }
+
+    func deleteHousehold(
+        householdID: String,
+        requestedByUserID: String
+    ) async throws {
+        let householdReference = householdsCollection.document(
+            householdID
+        )
+        let snapshot = try await householdReference.getDocument()
+
+        guard snapshot.exists,
+              let data = snapshot.data()
+        else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        let household = try Firestore.Decoder().decode(
+            HouseholdModel.self,
+            from: data
+        )
+
+        guard household.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        try await householdReference.setData(
+            ["deletion_state": "deleting"],
+            merge: true
+        )
+
+        let subcollectionNames = [
+            "tasks",
+            "shopping_items",
+            "bills",
+            "house_reminders",
+            "polls",
+            "board_posts"
+        ]
+        var referencesToDelete: [DocumentReference] = []
+
+        for collectionName in subcollectionNames {
+            let collectionSnapshot = try await householdReference
+                .collection(collectionName)
+                .getDocuments()
+
+            referencesToDelete.append(
+                contentsOf: collectionSnapshot.documents.map(\.reference)
+            )
+        }
+
+        for memberUserID in household.memberIds {
+            let notificationsSnapshot = try await database
+                .collection("users")
+                .document(memberUserID)
+                .collection("notifications")
+                .whereField("household_id", isEqualTo: householdID)
+                .getDocuments()
+
+            referencesToDelete.append(
+                contentsOf: notificationsSnapshot.documents.map(\.reference)
+            )
+        }
+
+        try await deleteDocumentsInBatches(referencesToDelete)
+
+        try await clearMembershipsInBatches(
+            household.memberIds,
+            householdReference: householdReference
+        )
+
+        try await householdReference.delete()
+    }
+
     func observeMembers(
         householdID: String,
         onChange: @escaping (Result<[HouseholdMemberModel], Error>) -> Void
@@ -246,6 +465,65 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
         }
 
         throw HouseholdServiceError.unableToCreateInviteCode
+    }
+
+    private func deleteDocumentsInBatches(
+        _ references: [DocumentReference]
+    ) async throws {
+        let batchSize = 450
+
+        for startIndex in stride(
+            from: 0,
+            to: references.count,
+            by: batchSize
+        ) {
+            let endIndex = min(
+                startIndex + batchSize,
+                references.count
+            )
+            let batch = database.batch()
+
+            for reference in references[startIndex..<endIndex] {
+                batch.deleteDocument(reference)
+            }
+
+            try await batch.commit()
+        }
+    }
+
+    private func clearMembershipsInBatches(
+        _ memberUserIDs: [String],
+        householdReference: DocumentReference
+    ) async throws {
+        let membersPerBatch = 200
+
+        for startIndex in stride(
+            from: 0,
+            to: memberUserIDs.count,
+            by: membersPerBatch
+        ) {
+            let endIndex = min(
+                startIndex + membersPerBatch,
+                memberUserIDs.count
+            )
+            let batch = database.batch()
+
+            for memberUserID in memberUserIDs[startIndex..<endIndex] {
+                batch.deleteDocument(
+                    householdReference
+                        .collection("members")
+                        .document(memberUserID)
+                )
+                batch.updateData(
+                    ["household_id": FieldValue.delete()],
+                    forDocument: database
+                        .collection("users")
+                        .document(memberUserID)
+                )
+            }
+
+            try await batch.commit()
+        }
     }
 
     private func makeMember(user: UserModel, householdID: String) -> HouseholdMemberModel {

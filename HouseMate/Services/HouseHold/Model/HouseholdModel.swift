@@ -26,6 +26,7 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
     var inviteCode: String
     
     var createdByUserId: String
+    var ownerUserId: String
     var memberIds: [String]
     
     
@@ -35,6 +36,7 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
         name: String,
         inviteCode: String,
         createdByUserId: String,
+        ownerUserId: String? = nil,
         memberIds: [String] = []
     ) {
         self.householdId = householdId
@@ -42,6 +44,7 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
         self.name = name
         self.inviteCode = inviteCode
         self.createdByUserId = createdByUserId
+        self.ownerUserId = ownerUserId ?? createdByUserId
         self.memberIds = memberIds
     }
     
@@ -52,7 +55,47 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
         case name
         case inviteCode = "invite_code"
         case createdByUserId = "created_by_user_id"
+        case ownerUserId = "owner_user_id"
         case memberIds = "member_ids"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(
+            keyedBy: CodingKeys.self
+        )
+
+        householdId = try container.decode(
+            String.self,
+            forKey: .householdId
+        )
+        createdAt = try container.decodeIfPresent(
+            Date.self,
+            forKey: .createdAt
+        )
+        name = try container.decode(
+            String.self,
+            forKey: .name
+        )
+        inviteCode = try container.decode(
+            String.self,
+            forKey: .inviteCode
+        )
+        createdByUserId = try container.decode(
+            String.self,
+            forKey: .createdByUserId
+        )
+        ownerUserId = try container.decodeIfPresent(
+            String.self,
+            forKey: .ownerUserId
+        ) ?? createdByUserId
+        memberIds = try container.decodeIfPresent(
+            [String].self,
+            forKey: .memberIds
+        ) ?? []
+    }
+
+    func isOwner(userID: String) -> Bool {
+        ownerUserId == userID
     }
     
     
@@ -64,6 +107,7 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
             "household_\(CodingKeys.name.rawValue)": name,
             "household_\(CodingKeys.inviteCode.rawValue)": inviteCode,
             "household_\(CodingKeys.createdByUserId.rawValue)": createdByUserId,
+            "household_\(CodingKeys.ownerUserId.rawValue)": ownerUserId,
             "household_\(CodingKeys.memberIds.rawValue)": memberIds
         ]
         

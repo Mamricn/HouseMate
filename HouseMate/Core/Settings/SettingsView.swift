@@ -16,6 +16,8 @@ struct SettingsView: View {
 
     let user: UserModel
     let onSignOut: () -> Void
+    var onManageHousehold: () -> Void = {}
+    var onManageAccount: () -> Void = {}
     var onNotificationPreferencesChanged: () async -> Void = {}
     var onSendTestNotification: () async -> Bool = { false }
 
@@ -36,23 +38,21 @@ struct SettingsView: View {
     private var billNotificationsEnabled = true
 
     var body: some View {
-        NavigationStack {
-            Form {
-                profileSection
-                householdSection
-                notificationsSection
-                aboutSection
-                accountSection
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(
-                    placement: .confirmationAction
-                ) {
-                    Button("Done") {
-                        dismiss()
-                    }
+        Form {
+            profileSection
+            householdSection
+            notificationsSection
+            aboutSection
+            accountSection
+        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(
+                placement: .confirmationAction
+            ) {
+                Button("Done") {
+                    dismiss()
                 }
             }
         }
@@ -105,6 +105,21 @@ struct SettingsView: View {
 
     private var householdSection: some View {
         Section {
+            Button {
+                onManageHousehold()
+            } label: {
+                HStack {
+                    Text("Manage Household")
+                        .foregroundStyle(.black)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
             Toggle(
                 "Automatic Weekly Assignment",
                 isOn: $automaticWeeklyAssignment
@@ -222,6 +237,21 @@ struct SettingsView: View {
 
     private var accountSection: some View {
         Section("Account") {
+            Button {
+                onManageAccount()
+            } label: {
+                HStack {
+                    Text("Account Settings")
+                        .foregroundStyle(.black)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
             Button {
                 dismiss()
                 onSignOut()

@@ -108,6 +108,92 @@ final class MockHouseholdService: HouseholdServiceProtocol {
             }
     }
 
+    func removeMember(
+        householdID: String,
+        memberUserID: String,
+        requestedByUserID: String
+    ) async throws {
+        guard var household = households[householdID] else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        guard household.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        guard memberUserID != household.ownerUserId else {
+            throw HouseholdServiceError.ownerCannotBeRemoved
+        }
+
+        guard household.memberIds.contains(memberUserID) else {
+            throw HouseholdServiceError.memberNotFound
+        }
+
+        household.memberIds.removeAll { $0 == memberUserID }
+        households[householdID] = household
+        membersByHouseholdID[householdID]?[memberUserID] = nil
+    }
+
+    func transferOwnership(
+        householdID: String,
+        newOwnerUserID: String,
+        requestedByUserID: String
+    ) async throws {
+        guard var household = households[householdID] else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        guard household.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        guard newOwnerUserID != requestedByUserID,
+              household.memberIds.contains(newOwnerUserID)
+        else {
+            throw HouseholdServiceError.memberNotFound
+        }
+
+        household.ownerUserId = newOwnerUserID
+        households[householdID] = household
+    }
+
+    func leaveHousehold(
+        householdID: String,
+        userID: String
+    ) async throws {
+        guard var household = households[householdID] else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        guard !household.isOwner(userID: userID) else {
+            throw HouseholdServiceError.ownershipTransferRequired
+        }
+
+        guard household.memberIds.contains(userID) else {
+            throw HouseholdServiceError.memberNotFound
+        }
+
+        household.memberIds.removeAll { $0 == userID }
+        households[householdID] = household
+        membersByHouseholdID[householdID]?[userID] = nil
+    }
+
+    func deleteHousehold(
+        householdID: String,
+        requestedByUserID: String
+    ) async throws {
+        guard let household = households[householdID] else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        guard household.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        households[householdID] = nil
+        membersByHouseholdID[householdID] = nil
+    }
+
     private func makeUniqueInviteCode() -> String {
         var inviteCode = Self.makeInviteCode()
 

@@ -20,6 +20,28 @@ protocol HouseholdServiceProtocol: AnyObject {
 
     func fetchMembers(householdID: String) async throws -> [HouseholdMemberModel]
 
+    func removeMember(
+        householdID: String,
+        memberUserID: String,
+        requestedByUserID: String
+    ) async throws
+
+    func transferOwnership(
+        householdID: String,
+        newOwnerUserID: String,
+        requestedByUserID: String
+    ) async throws
+
+    func leaveHousehold(
+        householdID: String,
+        userID: String
+    ) async throws
+
+    func deleteHousehold(
+        householdID: String,
+        requestedByUserID: String
+    ) async throws
+
     func observeMembers(
         householdID: String,
         onChange: @escaping (Result<[HouseholdMemberModel], Error>) -> Void
@@ -47,6 +69,10 @@ enum HouseholdServiceError: LocalizedError {
     case householdNotFound
     case userAlreadyHasHousehold
     case unableToCreateInviteCode
+    case ownerPermissionRequired
+    case ownerCannotBeRemoved
+    case memberNotFound
+    case ownershipTransferRequired
 
     var errorDescription: String? {
         switch self {
@@ -64,6 +90,18 @@ enum HouseholdServiceError: LocalizedError {
 
         case .unableToCreateInviteCode:
             return "We couldn't create an invite code. Please try again."
+
+        case .ownerPermissionRequired:
+            return "Only the household owner can remove members."
+
+        case .ownerCannotBeRemoved:
+            return "The household owner cannot be removed."
+
+        case .memberNotFound:
+            return "This person is no longer a member of the household."
+
+        case .ownershipTransferRequired:
+            return "Transfer ownership before leaving this household."
         }
     }
 }

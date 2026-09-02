@@ -27,6 +27,14 @@ protocol AuthServiceProtocol: AnyObject {
 
     func signInWithGoogle() async throws -> AuthSignInResult
 
+    func reauthenticateWithApple(
+        _ result: Result<ASAuthorization, Error>
+    ) async throws
+
+    func reauthenticateWithGoogle() async throws
+
+    func deleteCurrentUser() async throws
+
     func signOut() throws
 }
 
@@ -43,6 +51,7 @@ enum AuthServiceError: LocalizedError {
     case invalidAppleIdentityToken
 
     case missingGoogleIDToken
+    case missingCurrentUser
 
     var errorDescription: String? {
         switch self {
@@ -66,6 +75,9 @@ enum AuthServiceError: LocalizedError {
 
         case .missingGoogleIDToken:
             return "Google did not return an identity token."
+
+        case .missingCurrentUser:
+            return "Your signed-in account could not be found."
         }
     }
 }

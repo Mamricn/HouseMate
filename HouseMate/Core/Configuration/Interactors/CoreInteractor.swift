@@ -94,6 +94,24 @@ struct CoreInteractor {
         try authService.signOut()
     }
 
+    var currentAuthProvider: AuthProvider {
+        authService.currentUser?.provider ?? .unknown
+    }
+
+    func reauthenticateWithApple(
+        _ result: Result<ASAuthorization, Error>
+    ) async throws {
+        try await authService.reauthenticateWithApple(result)
+    }
+
+    func reauthenticateWithGoogle() async throws {
+        try await authService.reauthenticateWithGoogle()
+    }
+
+    func deleteCurrentAuthUser() async throws {
+        try await authService.deleteCurrentUser()
+    }
+
     // MARK: - User
 
     func getUser(
@@ -128,6 +146,10 @@ struct CoreInteractor {
         )
     }
 
+    func deleteUserData(userID: String) async throws {
+        try await userService.deleteUserData(userID: userID)
+    }
+
     // MARK: - HouseholdManager
 
     var currentHousehold: HouseholdModel? {
@@ -160,6 +182,40 @@ struct CoreInteractor {
 
     func clearCurrentHousehold() {
         householdManager.clearCurrentHousehold()
+    }
+
+    func removeHouseholdMember(
+        userID: String,
+        requestedByUserID: String
+    ) async throws {
+        try await householdManager.removeMember(
+            userID: userID,
+            requestedByUserID: requestedByUserID
+        )
+    }
+
+    func transferHouseholdOwnership(
+        to newOwnerUserID: String,
+        requestedByUserID: String
+    ) async throws {
+        try await householdManager.transferOwnership(
+            to: newOwnerUserID,
+            requestedByUserID: requestedByUserID
+        )
+    }
+
+    func leaveHousehold(userID: String) async throws {
+        try await householdManager.leaveHousehold(
+            userID: userID
+        )
+    }
+
+    func deleteHousehold(
+        requestedByUserID: String
+    ) async throws {
+        try await householdManager.deleteHousehold(
+            requestedByUserID: requestedByUserID
+        )
     }
 
     // MARK: - Tasks

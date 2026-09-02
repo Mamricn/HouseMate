@@ -23,6 +23,10 @@ final class HousematesViewModel {
 
     let householdOwnerUserID: String
 
+    var isCurrentUserOwner: Bool {
+        householdOwnerUserID == currentUser.id
+    }
+
     var posts: [BoardPostModel] {
         interactor.boardPosts
     }
@@ -58,7 +62,7 @@ final class HousematesViewModel {
             currentUser: UserModel.mockList[0],
             users: UserModel.mockList,
             members: HouseholdMemberModel.mockList,
-            householdOwnerUserID: HouseholdModel.mock.createdByUserId,
+            householdOwnerUserID: HouseholdModel.mock.ownerUserId,
             interactor: CoreInteractor(container: container)
         )
     }

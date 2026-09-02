@@ -28,6 +28,8 @@ protocol UserServiceProtocol: AnyObject {
         _ householdID: String?,
         for userID: String
     ) async throws
+
+    func deleteUserData(userID: String) async throws
 }
 
 

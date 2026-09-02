@@ -299,8 +299,8 @@ struct HomeView: View {
 
     let viewModel: HomeViewModel
     let onSignOut: () -> Void
+    var onOpenSettings: () -> Void = {}
 
-    @State private var showsSettings = false
     @State private var toast: AppToast?
 
     var body: some View {
@@ -308,22 +308,6 @@ struct HomeView: View {
             backgroundGradient
             content
             toastOverlay
-        }
-        .sheet(
-            isPresented: $showsSettings
-        ) {
-            SettingsView(
-                user: viewModel.user,
-                onSignOut: onSignOut,
-                onNotificationPreferencesChanged: {
-                    await viewModel.applyNotificationPreferences()
-                },
-                onSendTestNotification: {
-                    await viewModel.sendTestNotification()
-                }
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -390,7 +374,7 @@ struct HomeView: View {
 
     private var profileButton: some View {
         Button {
-            showsSettings = true
+            onOpenSettings()
         } label: {
             ZStack {
                 Circle()

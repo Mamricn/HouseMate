@@ -1,0 +1,296 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function householdExists(householdId) {
+      return exists(
+        /databases/$(database)/documents/households/$(householdId)
+      );
+    }
+
+    function householdData(householdId) {
+      return get(
+        /databases/$(database)/documents/households/$(householdId)
+      ).data;
+    }
+
+    function ownerId(data) {
+      return data.get(
+        'owner_user_id',
+        data.get('created_by_user_id', '')
+      );
+    }
+
+    function isHouseholdMember(householdId) {
+      return signedIn()
+        && householdExists(householdId)
+        && request.auth.uid in householdData(householdId)
+          .get('member_ids', []);
+    }
+
+    function isHouseholdOwner(householdId) {
+      return signedIn()
+        && householdExists(householdId)
+        && request.auth.uid == ownerId(
+          householdData(householdId)
+        );
+    }
+
+    function belongsToHousehold(data, householdId) {
+      return data.get('household_id', '') == householdId;
+    }
+
+    // USERS
+
+    match /users/{userId} {
+      allow create: if isSelf(userId)
+        && request.resource.data.get('user_id', '') == userId;
+
+      allow read: if isSelf(userId);
+
+      allow update: if isSelf(userId)
+        && request.resource.data.get('user_id', userId) == userId
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            'name',
+            'email',
+            'profile_image_url',
+            'household_id',
+            'last_sign_in_date',
+            'creation_version'
+          ]);
+
+      // The owner can disconnect another member. During household deletion
+      // the household document still exists and is removed last.
+      allow update: if resource.data.get('household_id', '') != ''
+        && isHouseholdOwner(
+          resource.data.get('household_id', '')
+        )
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['household_id'])
+        && request.resource.data.get('household_id', '') == '';
+
+      allow delete: if isSelf(userId);
+
+      match /notifications/{notificationId} {
+        allow read, update, delete: if isSelf(userId);
+
+        allow create: if isSelf(userId)
+          && request.resource.data.get(
+            'recipient_user_id',
+            ''
+          ) == userId;
+
+        // Used by the owner while deleting the whole household.
+        allow delete: if resource.data.get('household_id', '') != ''
+          && isHouseholdOwner(
+            resource.data.get('household_id', '')
+          );
+      }
+    }
+
+    // HOUSEHOLDS
+
+    match /households/{householdId} {
+      allow create: if signedIn()
+        && request.resource.data.get('household_id', '') == householdId
+        && request.resource.data.get(
+          'created_by_user_id',
+          ''
+        ) == request.auth.uid
+        && ownerId(request.resource.data) == request.auth.uid
+        && request.resource.data.get('member_ids', [])
+          .hasOnly([request.auth.uid])
+        && request.resource.data.get('member_ids', [])
+          .hasAll([request.auth.uid]);
+
+      // Required by the current invite-code query. A separate invite-code
+      // lookup collection should replace this before a public release.
+      allow read: if signedIn();
+
+      // A signed-in user can join only by adding exactly their own ID while
+      // preserving every existing member and every other household field.
+      allow update: if signedIn()
+        && !(request.auth.uid in resource.data.get('member_ids', []))
+        && request.auth.uid in request.resource.data.get('member_ids', [])
+        && request.resource.data.get('member_ids', [])
+          .hasAll(resource.data.get('member_ids', []))
+        && request.resource.data.get('member_ids', []).size()
+          == resource.data.get('member_ids', []).size() + 1
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['member_ids'])
+        && resource.data.get('deletion_state', '') == '';
+
+      // A regular member can remove exactly their own ID when leaving.
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.get('member_ids', [])
+        && !(request.auth.uid
+          in request.resource.data.get('member_ids', []))
+        && resource.data.get('member_ids', [])
+          .hasAll(request.resource.data.get('member_ids', []))
+        && request.resource.data.get('member_ids', []).size()
+          == resource.data.get('member_ids', []).size() - 1
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['member_ids'])
+        && request.auth.uid != ownerId(resource.data);
+
+      // The current owner can transfer ownership, remove members, update
+      // household details, or mark the household for deletion.
+      allow update: if isHouseholdOwner(householdId)
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            'owner_user_id',
+            'member_ids',
+            'name',
+            'invite_code',
+            'deletion_state'
+          ])
+        && ownerId(request.resource.data)
+          in request.resource.data.get('member_ids', []);
+
+      allow delete: if isHouseholdOwner(householdId);
+
+      match /members/{memberUserId} {
+        allow read: if isHouseholdMember(householdId);
+
+        // Creation of the owner's member document and joining through an
+        // invite both happen in a batch with the household membership update.
+        allow create: if isSelf(memberUserId)
+          && request.resource.data.get('user_id', '') == memberUserId
+          && belongsToHousehold(
+            request.resource.data,
+            householdId
+          )
+          && request.auth.uid in getAfter(
+            /databases/$(database)/documents/households/$(householdId)
+          ).data.get('member_ids', []);
+
+        allow update: if isSelf(memberUserId)
+          && request.resource.data.get('user_id', '') == memberUserId
+          && belongsToHousehold(
+            request.resource.data,
+            householdId
+          )
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'display_name',
+              'profile_image_url'
+            ]);
+
+        allow delete: if isSelf(memberUserId)
+          || isHouseholdOwner(householdId);
+      }
+
+      match /tasks/{taskId} {
+        allow read: if isHouseholdMember(householdId);
+        allow create: if isHouseholdMember(householdId)
+          && belongsToHousehold(request.resource.data, householdId);
+        allow update, delete: if isHouseholdMember(householdId);
+      }
+
+      match /shopping_items/{itemId} {
+        allow read: if isHouseholdMember(householdId);
+        allow create: if isHouseholdMember(householdId)
+          && belongsToHousehold(request.resource.data, householdId);
+        allow update, delete: if isHouseholdMember(householdId);
+      }
+
+      match /bills/{billId} {
+        allow read: if isHouseholdMember(householdId);
+        allow create: if isHouseholdMember(householdId)
+          && belongsToHousehold(request.resource.data, householdId);
+        allow update, delete: if isHouseholdMember(householdId);
+      }
+
+      match /board_posts/{postId} {
+        allow read: if isHouseholdMember(householdId);
+        allow create: if isHouseholdMember(householdId)
+          && belongsToHousehold(request.resource.data, householdId)
+          && request.resource.data.get(
+            'created_by_user_id',
+            ''
+          ) == request.auth.uid;
+        allow delete: if isHouseholdOwner(householdId)
+          || (
+            isHouseholdMember(householdId)
+            && resource.data.get('created_by_user_id', '')
+              == request.auth.uid
+          );
+        allow update: if false;
+      }
+
+      match /polls/{pollId} {
+        allow read: if isHouseholdMember(householdId);
+        allow create: if isHouseholdMember(householdId)
+          && belongsToHousehold(request.resource.data, householdId)
+          && request.resource.data.get(
+            'created_by_user_id',
+            ''
+          ) == request.auth.uid;
+
+        allow update: if isHouseholdMember(householdId)
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['votes_by_user_id']);
+
+        allow update: if isHouseholdMember(householdId)
+          && resource.data.get('created_by_user_id', '')
+            == request.auth.uid
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['status']);
+
+        allow delete: if isHouseholdOwner(householdId)
+          || (
+            isHouseholdMember(householdId)
+            && resource.data.get('created_by_user_id', '')
+              == request.auth.uid
+          );
+      }
+
+      match /house_reminders/{reminderId} {
+        allow read: if isHouseholdMember(householdId);
+        allow create: if isHouseholdMember(householdId)
+          && belongsToHousehold(request.resource.data, householdId)
+          && request.resource.data.get(
+            'created_by_user_id',
+            ''
+          ) == request.auth.uid;
+        allow delete: if isHouseholdOwner(householdId)
+          || (
+            isHouseholdMember(householdId)
+            && resource.data.get('created_by_user_id', '')
+              == request.auth.uid
+          );
+        allow update: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

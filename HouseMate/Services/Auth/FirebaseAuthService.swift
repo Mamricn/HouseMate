@@ -111,6 +111,52 @@ final class FirebaseAuthService: AuthServiceProtocol {
     }
 
     func signInWithGoogle() async throws -> AuthSignInResult {
+        let firebaseCredential = try await googleCredential()
+
+        let firebaseResult = try await Auth.auth().signIn(
+            with: firebaseCredential
+        )
+
+        return completeSignIn(
+            firebaseResult: firebaseResult
+        )
+    }
+
+    func reauthenticateWithApple(
+        _ result: Result<ASAuthorization, Error>
+    ) async throws {
+        let credential = try appleCredential(from: result)
+
+        guard let user = Auth.auth().currentUser else {
+            throw AuthServiceError.missingCurrentUser
+        }
+
+        try await user.reauthenticate(with: credential)
+        currentAppleNonce = nil
+    }
+
+    func reauthenticateWithGoogle() async throws {
+        let credential = try await googleCredential()
+
+        guard let user = Auth.auth().currentUser else {
+            throw AuthServiceError.missingCurrentUser
+        }
+
+        try await user.reauthenticate(with: credential)
+    }
+
+    func deleteCurrentUser() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw AuthServiceError.missingCurrentUser
+        }
+
+        try await user.delete()
+        GIDSignIn.sharedInstance.signOut()
+        currentUser = nil
+        notifyAuthStateChanged()
+    }
+
+    private func googleCredential() async throws -> AuthCredential {
         guard let clientID =
                 FirebaseApp.app()?.options.clientID
         else {
@@ -143,18 +189,42 @@ final class FirebaseAuthService: AuthServiceProtocol {
         let accessToken =
             googleResult.user.accessToken.tokenString
 
-        let firebaseCredential =
-            GoogleAuthProvider.credential(
+        return GoogleAuthProvider.credential(
                 withIDToken: idToken,
                 accessToken: accessToken
             )
+    }
 
-        let firebaseResult = try await Auth.auth().signIn(
-            with: firebaseCredential
-        )
+    private func appleCredential(
+        from result: Result<ASAuthorization, Error>
+    ) throws -> AuthCredential {
+        let authorization = try result.get()
 
-        return completeSignIn(
-            firebaseResult: firebaseResult
+        guard let appleCredential = authorization.credential
+            as? ASAuthorizationAppleIDCredential
+        else {
+            throw AuthServiceError.missingAppleCredential
+        }
+
+        guard let nonce = currentAppleNonce else {
+            throw AuthServiceError.missingAppleNonce
+        }
+
+        guard let identityToken = appleCredential.identityToken else {
+            throw AuthServiceError.missingAppleIdentityToken
+        }
+
+        guard let identityTokenString = String(
+            data: identityToken,
+            encoding: .utf8
+        ) else {
+            throw AuthServiceError.invalidAppleIdentityToken
+        }
+
+        return OAuthProvider.appleCredential(
+            withIDToken: identityTokenString,
+            rawNonce: nonce,
+            fullName: appleCredential.fullName
         )
     }
 
@@ -259,8 +329,28 @@ private extension UserAuthInfo {
             creationDate:
                 firebaseUser.metadata.creationDate,
             lastSignInDate:
-                firebaseUser.metadata.lastSignInDate
+                firebaseUser.metadata.lastSignInDate,
+            provider: firebaseUser.authProvider
         )
+    }
+}
+
+private extension FirebaseAuth.User {
+
+    var authProvider: AuthProvider {
+        if providerData.contains(where: {
+            $0.providerID == "apple.com"
+        }) {
+            return .apple
+        }
+
+        if providerData.contains(where: {
+            $0.providerID == "google.com"
+        }) {
+            return .google
+        }
+
+        return .unknown
     }
 }
 

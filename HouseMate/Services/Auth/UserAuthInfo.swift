@@ -9,6 +9,12 @@
 
 import Foundation
 
+enum AuthProvider: String, Sendable {
+    case apple
+    case google
+    case unknown
+}
+
 struct UserAuthInfo: Equatable, Sendable {
 
     let uid: String
@@ -17,6 +23,7 @@ struct UserAuthInfo: Equatable, Sendable {
     let profileImageURL: URL?
     let creationDate: Date?
     let lastSignInDate: Date?
+    let provider: AuthProvider
 
     init(
         uid: String,
@@ -24,7 +31,8 @@ struct UserAuthInfo: Equatable, Sendable {
         displayName: String? = nil,
         profileImageURL: URL? = nil,
         creationDate: Date? = nil,
-        lastSignInDate: Date? = nil
+        lastSignInDate: Date? = nil,
+        provider: AuthProvider = .unknown
     ) {
         self.uid = uid
         self.email = email
@@ -32,6 +40,7 @@ struct UserAuthInfo: Equatable, Sendable {
         self.profileImageURL = profileImageURL
         self.creationDate = creationDate
         self.lastSignInDate = lastSignInDate
+        self.provider = provider
     }
 }
 
@@ -57,7 +66,8 @@ extension UserAuthInfo {
         displayName: "Marcin",
         profileImageURL: nil,
         creationDate: .now,
-        lastSignInDate: .now
+        lastSignInDate: .now,
+        provider: .google
     )
 }
 

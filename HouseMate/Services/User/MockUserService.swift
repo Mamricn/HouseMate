@@ -71,6 +71,14 @@ final class MockUserService: UserServiceProtocol {
         users[userID] = user
     }
 
+    func deleteUserData(userID: String) async throws {
+        guard users[userID] != nil else {
+            throw UserServiceError.userNotFound
+        }
+
+        users[userID] = nil
+    }
+
     private var appVersion: String? {
         Bundle.main.object(
             forInfoDictionaryKey:

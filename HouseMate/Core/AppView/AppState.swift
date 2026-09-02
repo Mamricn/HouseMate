@@ -113,6 +113,17 @@ final class AppState {
         route = .main
     }
 
+    func completeHouseholdExit() {
+        guard var currentUser else { return }
+
+        currentUser.householdId = nil
+        self.currentUser = currentUser
+        currentHousehold = nil
+        householdMembers = []
+        clearHouseholdData()
+        route = .householdOnboarding
+    }
+
     func clearError() {
         errorMessage = nil
     }
@@ -123,14 +134,7 @@ final class AppState {
         self.authUser = authUser
 
         guard let authUser else {
-            interactor.clearCurrentHousehold()
-            interactor.clearTasks()
-            interactor.clearShoppingItems()
-            interactor.clearBills()
-            interactor.clearBoardPosts()
-            interactor.clearPolls()
-            interactor.clearHouseReminders()
-            interactor.clearNotifications()
+            clearHouseholdData()
             currentUser = nil
             currentHousehold = nil
             householdMembers = []
@@ -172,19 +176,24 @@ final class AppState {
                 route = .householdOnboarding
             }
         } catch {
-            interactor.clearTasks()
-            interactor.clearShoppingItems()
-            interactor.clearBills()
-            interactor.clearBoardPosts()
-            interactor.clearPolls()
-            interactor.clearHouseReminders()
-            interactor.clearNotifications()
+            clearHouseholdData()
             currentUser = nil
             currentHousehold = nil
             householdMembers = []
             errorMessage = error.localizedDescription
             route = .welcome
         }
+    }
+
+    private func clearHouseholdData() {
+        interactor.clearCurrentHousehold()
+        interactor.clearTasks()
+        interactor.clearShoppingItems()
+        interactor.clearBills()
+        interactor.clearBoardPosts()
+        interactor.clearPolls()
+        interactor.clearHouseReminders()
+        interactor.clearNotifications()
     }
 }
 

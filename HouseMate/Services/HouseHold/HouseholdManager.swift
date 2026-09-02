@@ -110,6 +110,77 @@ final class HouseholdManager {
         currentMembers = []
     }
 
+    func removeMember(
+        userID: String,
+        requestedByUserID: String
+    ) async throws {
+        guard let currentHousehold else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        guard currentHousehold.isOwner(
+            userID: requestedByUserID
+        ) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        guard userID != currentHousehold.ownerUserId else {
+            throw HouseholdServiceError.ownerCannotBeRemoved
+        }
+
+        try await householdService.removeMember(
+            householdID: currentHousehold.householdId,
+            memberUserID: userID,
+            requestedByUserID: requestedByUserID
+        )
+
+        currentMembers.removeAll { $0.userId == userID }
+        self.currentHousehold?.memberIds.removeAll { $0 == userID }
+    }
+
+    func transferOwnership(
+        to newOwnerUserID: String,
+        requestedByUserID: String
+    ) async throws {
+        guard let currentHousehold else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        try await householdService.transferOwnership(
+            householdID: currentHousehold.householdId,
+            newOwnerUserID: newOwnerUserID,
+            requestedByUserID: requestedByUserID
+        )
+
+        self.currentHousehold?.ownerUserId = newOwnerUserID
+    }
+
+    func leaveHousehold(userID: String) async throws {
+        guard let currentHousehold else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        try await householdService.leaveHousehold(
+            householdID: currentHousehold.householdId,
+            userID: userID
+        )
+
+        clearCurrentHousehold()
+    }
+
+    func deleteHousehold(requestedByUserID: String) async throws {
+        guard let currentHousehold else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        try await householdService.deleteHousehold(
+            householdID: currentHousehold.householdId,
+            requestedByUserID: requestedByUserID
+        )
+
+        clearCurrentHousehold()
+    }
+
     private func startObservingMembers(householdID: String) {
         membersObservation?.cancel()
         membersObservation = householdService.observeMembers(

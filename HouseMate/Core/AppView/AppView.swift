@@ -115,6 +115,9 @@ struct AppView: View {
                     interactor: interactor,
                     onSignOut: {
                         appState.signOut()
+                    },
+                    onHouseholdLeft: {
+                        appState.completeHouseholdExit()
                     }
                 )
                 .transition(

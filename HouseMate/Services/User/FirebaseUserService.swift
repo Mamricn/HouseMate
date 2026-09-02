@@ -103,6 +103,35 @@ final class FirebaseUserService: UserServiceProtocol {
             ])
     }
 
+    func deleteUserData(userID: String) async throws {
+        let userReference = usersCollection.document(userID)
+        let notificationsSnapshot = try await userReference
+            .collection("notifications")
+            .getDocuments()
+
+        for startIndex in stride(
+            from: 0,
+            to: notificationsSnapshot.documents.count,
+            by: 450
+        ) {
+            let endIndex = min(
+                startIndex + 450,
+                notificationsSnapshot.documents.count
+            )
+            let batch = database.batch()
+
+            for document in notificationsSnapshot.documents[
+                startIndex..<endIndex
+            ] {
+                batch.deleteDocument(document.reference)
+            }
+
+            try await batch.commit()
+        }
+
+        try await userReference.delete()
+    }
+
     private var appVersion: String? {
         Bundle.main.object(
             forInfoDictionaryKey:

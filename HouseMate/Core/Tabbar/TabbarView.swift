@@ -15,8 +15,10 @@ struct TabbarView: View {
     private let household: HouseholdModel
 
     var onSignOut: () -> Void = {}
+    var onHouseholdLeft: () -> Void = {}
 
     @State private var activeTab: CustomTab = .home
+    @State private var router = AppRouter()
 
     @State private var homeViewModel: HomeViewModel
 
@@ -34,11 +36,13 @@ struct TabbarView: View {
         household: HouseholdModel,
         members: [HouseholdMemberModel],
         interactor: CoreInteractor,
-        onSignOut: @escaping () -> Void = {}
+        onSignOut: @escaping () -> Void = {},
+        onHouseholdLeft: @escaping () -> Void = {}
     ) {
         self.interactor = interactor
         self.household = household
         self.onSignOut = onSignOut
+        self.onHouseholdLeft = onHouseholdLeft
 
         let householdUsers = members.map { member in
             UserModel(
@@ -70,7 +74,7 @@ struct TabbarView: View {
                 currentUser: user,
                 users: householdUsers,
                 members: members,
-                householdOwnerUserID: household.createdByUserId,
+                householdOwnerUserID: household.ownerUserId,
                 interactor: interactor
             )
         )
@@ -96,35 +100,45 @@ struct TabbarView: View {
     }
 
     var body: some View {
-        TabView(selection: $activeTab) {
-            Tab(value: .home) {
-                HomeView(
-                    viewModel: homeViewModel,
-                    onSignOut: onSignOut
-                )
-                .customTabBarSafeArea()
-            }
+        NavigationStack(path: $router.path) {
+            TabView(selection: $activeTab) {
+                Tab(value: .home) {
+                    HomeView(
+                        viewModel: homeViewModel,
+                        onSignOut: onSignOut,
+                        onOpenSettings: {
+                            router.navigate(to: .settings)
+                        }
+                    )
+                    .customTabBarSafeArea()
+                }
 
-            Tab(value: .houseHold) {
-                HouseholdView(
-                    viewModel: householdViewModel
-                )
-                .customTabBarSafeArea()
-            }
+                Tab(value: .houseHold) {
+                    HouseholdView(
+                        viewModel: householdViewModel
+                    )
+                    .customTabBarSafeArea()
+                }
 
-            Tab(value: .housemates) {
-                HousematesView(
-                    viewModel: housematesViewModel
-                )
-                .customTabBarSafeArea()
+                Tab(value: .housemates) {
+                    HousematesView(
+                        viewModel: housematesViewModel
+                    )
+                    .customTabBarSafeArea()
+                }
+            }
+            .navigationDestination(for: MainRoute.self) { route in
+                destination(for: route)
             }
         }
         .safeAreaInset(
             edge: .bottom,
             spacing: 0
         ) {
-            customTabBarView
-                .padding(.horizontal, 20)
+            if router.path.isEmpty {
+                customTabBarView
+                    .padding(.horizontal, 20)
+            }
         }
         .sheet(item: $activeSheet) { sheet in
             sheetContent(for: sheet)
@@ -154,6 +168,62 @@ struct TabbarView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .houseMateNotificationOpened)) { notification in
             openSystemNotification(userInfo: notification.userInfo ?? [:])
+        }
+    }
+
+    // MARK: - Navigation
+
+    @ViewBuilder
+    private func destination(for route: MainRoute) -> some View {
+        switch route {
+        case .settings:
+            SettingsView(
+                user: homeViewModel.user,
+                onSignOut: {
+                    router.reset()
+                    onSignOut()
+                },
+                onManageHousehold: {
+                    router.navigate(to: .householdSettings)
+                },
+                onManageAccount: {
+                    router.navigate(to: .accountSettings)
+                },
+                onNotificationPreferencesChanged: {
+                    await homeViewModel.applyNotificationPreferences()
+                },
+                onSendTestNotification: {
+                    await homeViewModel.sendTestNotification()
+                }
+            )
+
+        case .householdSettings:
+            HouseholdSettingsView(
+                viewModel: HouseholdSettingsViewModel(
+                    household: interactor.currentHousehold ?? household,
+                    currentUser: homeViewModel.user,
+                    interactor: interactor
+                ),
+                onHouseholdLeft: {
+                    router.reset()
+                    onHouseholdLeft()
+                }
+            )
+
+        case .accountSettings:
+            AccountSettingsView(
+                viewModel: AccountSettingsViewModel(
+                    user: homeViewModel.user,
+                    household: interactor.currentHousehold ?? household,
+                    interactor: interactor
+                ),
+                onManageHousehold: {
+                    router.navigate(to: .householdSettings)
+                },
+                onAccountDeleted: {
+                    router.reset()
+                }
+            )
         }
     }
 
