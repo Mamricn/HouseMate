@@ -13,4 +13,5 @@ enum MainRoute: Hashable {
     case settings
     case householdSettings
     case accountSettings
+    case profileSettings
 }

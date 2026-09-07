@@ -40,7 +40,14 @@ struct CustomTabBar2: UIViewRepresentable {
         return control
     }
     func updateUIView(_ uiView: UISegmentedControl, context: Context) {
-        
+        context.coordinator.parent = self
+
+        guard let selectedIndex = CustomTab.allCases.firstIndex(of: activeTab),
+              uiView.selectedSegmentIndex != selectedIndex else {
+            return
+        }
+
+        uiView.selectedSegmentIndex = selectedIndex
     }
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UISegmentedControl, context: Context) -> CGSize? {
         return size

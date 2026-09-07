@@ -21,6 +21,8 @@ final class DependencyContainer {
     let houseReminderManager: HouseReminderManager
     let notificationManager: NotificationManager
     let localNotificationService: any LocalNotificationServiceProtocol
+    let remoteNotificationService: any RemoteNotificationServiceProtocol
+    let profileImageService: any ProfileImageServiceProtocol
 
     init(
         authService: any AuthServiceProtocol,
@@ -33,7 +35,9 @@ final class DependencyContainer {
         pollManager: PollManager,
         houseReminderManager: HouseReminderManager,
         notificationManager: NotificationManager,
-        localNotificationService: any LocalNotificationServiceProtocol
+        localNotificationService: any LocalNotificationServiceProtocol,
+        remoteNotificationService: any RemoteNotificationServiceProtocol,
+        profileImageService: any ProfileImageServiceProtocol
     ) {
         self.authService = authService
         self.userService = userService
@@ -46,6 +50,8 @@ final class DependencyContainer {
         self.houseReminderManager = houseReminderManager
         self.notificationManager = notificationManager
         self.localNotificationService = localNotificationService
+        self.remoteNotificationService = remoteNotificationService
+        self.profileImageService = profileImageService
     }
 
     static func make() -> DependencyContainer {
@@ -80,7 +86,9 @@ final class DependencyContainer {
                     notificationService: localNotificationService
                 ),
                 notificationManager: NotificationManager(service: MockNotificationService()),
-                localNotificationService: localNotificationService
+                localNotificationService: localNotificationService,
+                remoteNotificationService: MockRemoteNotificationService(),
+                profileImageService: MockProfileImageService()
             )
 
         case .development, .production:
@@ -105,7 +113,9 @@ final class DependencyContainer {
                     notificationService: localNotificationService
                 ),
                 notificationManager: NotificationManager(service: FirebaseNotificationService()),
-                localNotificationService: localNotificationService
+                localNotificationService: localNotificationService,
+                remoteNotificationService: FirebaseRemoteNotificationService.shared,
+                profileImageService: FirebaseProfileImageService()
             )
         }
     }

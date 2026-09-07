@@ -46,6 +46,12 @@ struct CoreInteractor {
     private let localNotificationService:
         any LocalNotificationServiceProtocol
 
+    private let remoteNotificationService:
+        any RemoteNotificationServiceProtocol
+
+    private let profileImageService:
+        any ProfileImageServiceProtocol
+
     init(
         container: DependencyContainer
     ) {
@@ -60,6 +66,8 @@ struct CoreInteractor {
         self.houseReminderManager = container.houseReminderManager
         self.notificationManager = container.notificationManager
         self.localNotificationService = container.localNotificationService
+        self.remoteNotificationService = container.remoteNotificationService
+        self.profileImageService = container.profileImageService
     }
 
     // MARK: - Authentication
@@ -92,6 +100,27 @@ struct CoreInteractor {
 
     func signOut() throws {
         try authService.signOut()
+    }
+
+    func registerRemoteNotifications(for user: UserModel) async throws {
+        let isAuthorized = try await localNotificationService
+            .requestAuthorization()
+
+        #if DEBUG
+        print("Notification permission granted: \(isAuthorized)")
+        #endif
+
+        guard isAuthorized else {
+            return
+        }
+
+        try await remoteNotificationService.registerDevice(for: user)
+    }
+
+    func unregisterRemoteNotifications(userID: String) async {
+        await remoteNotificationService.unregisterCurrentDevice(
+            userID: userID
+        )
     }
 
     var currentAuthProvider: AuthProvider {
@@ -148,6 +177,53 @@ struct CoreInteractor {
 
     func deleteUserData(userID: String) async throws {
         try await userService.deleteUserData(userID: userID)
+    }
+
+    func uploadProfileImage(
+        data: Data,
+        for user: UserModel
+    ) async throws -> String {
+        let compressedData = try ProfileImageProcessor.compressedJPEG(
+            from: data
+        )
+        let newURL = try await profileImageService.uploadProfileImage(
+            compressedData,
+            userID: user.id
+        )
+
+        do {
+            try await userService.updateProfileImageURL(
+                newURL.absoluteString,
+                userID: user.id,
+                householdID: user.householdId
+            )
+        } catch {
+            try? await profileImageService.deleteProfileImage(at: newURL)
+            throw error
+        }
+
+        if let oldURLString = user.profileImageUrl,
+           let oldURL = URL(string: oldURLString),
+           oldURL != newURL {
+            ProfileImageCache.shared.removeImage(for: oldURL)
+            try? await profileImageService.deleteProfileImage(at: oldURL)
+        }
+
+        return newURL.absoluteString
+    }
+
+    func removeProfileImage(for user: UserModel) async throws {
+        try await userService.updateProfileImageURL(
+            nil,
+            userID: user.id,
+            householdID: user.householdId
+        )
+
+        if let urlString = user.profileImageUrl,
+           let url = URL(string: urlString) {
+            ProfileImageCache.shared.removeImage(for: url)
+            try? await profileImageService.deleteProfileImage(at: url)
+        }
     }
 
     // MARK: - HouseholdManager
@@ -421,6 +497,17 @@ struct CoreInteractor {
         taskManager.refreshNotifications()
         billManager.refreshNotifications()
         houseReminderManager.refreshNotifications()
+
+        do {
+            try await remoteNotificationService.updatePreferences()
+        } catch {
+            #if DEBUG
+            print(
+                "Remote notification preferences update failed: "
+                + error.localizedDescription
+            )
+            #endif
+        }
     }
 
     func localNotificationAuthorizationStatus() async -> LocalNotificationAuthorizationStatus {

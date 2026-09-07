@@ -78,6 +78,22 @@ final class HomeViewModel {
         )
     }
 
+    var greeting: String {
+        switch calendar.component(.hour, from: .now) {
+        case 5..<12:
+            return "Good morning"
+
+        case 12..<17:
+            return "Good afternoon"
+
+        case 17..<22:
+            return "Good evening"
+
+        default:
+            return "Good night"
+        }
+    }
+
     // MARK: - Today's Tasks
 
     var todaysTasks: [TaskModel] {
@@ -302,6 +318,7 @@ struct HomeView: View {
     var onOpenSettings: () -> Void = {}
 
     @State private var toast: AppToast?
+    @State private var isHeaderElevated = false
 
     var body: some View {
         ZStack {
@@ -314,60 +331,82 @@ struct HomeView: View {
     // MARK: - Content
 
     private var content: some View {
-        ScrollView {
-            LazyVStack(
-                alignment: .leading,
-                spacing: 20
-            ) {
-                header
-                tasksCard
-                comingUpCard
-                shoppingCard
-                billsCard
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 18)
-            .padding(.bottom, 35)
-        }
-        .refreshable {
-            await viewModel.refreshData()
+        VStack(spacing: 0) {
+            header
+                .padding(.horizontal, 18)
+                .background {
+                    if isHeaderElevated {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .ignoresSafeArea(edges: .top)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: isHeaderElevated)
 
-            if let errorMessage = viewModel.actionState.errorMessage {
-                showToast(
-                    message: errorMessage,
-                    systemImage: "exclamationmark.triangle.fill",
-                    color: .red
-                )
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 20
+                ) {
+                    tasksCard
+                    comingUpCard
+                    shoppingCard
+                    billsCard
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 35)
+            }
+            .refreshable {
+                await viewModel.refreshData()
+
+                if let errorMessage = viewModel.actionState.errorMessage {
+                    showToast(
+                        message: errorMessage,
+                        systemImage: "exclamationmark.triangle.fill",
+                        color: .red
+                    )
+                }
+            }
+            .scrollIndicators(.hidden)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y > 4
+            } action: { _, isScrolled in
+                isHeaderElevated = isScrolled
             }
         }
-        .scrollIndicators(.hidden)
     }
 
     // MARK: - Header
 
     private var header: some View {
         HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Hello \(viewModel.userName)")
+            profileButton
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(viewModel.greeting), \(viewModel.userName)")
                     .font(
                         .system(
-                            size: 30,
-                            weight: .bold,
+                            size: 19,
+                            weight: .semibold,
                             design: .rounded
                         )
                     )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
 
                 Text("It’s \(viewModel.formattedToday)")
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer()
-
-            profileButton
         }
         .padding(.horizontal, 4)
-        .padding(.bottom, 8)
+        .padding(.vertical, 6)
+        .zIndex(1)
     }
 
     // MARK: - Profile Button
@@ -376,20 +415,11 @@ struct HomeView: View {
         Button {
             onOpenSettings()
         } label: {
-            ZStack {
-                Circle()
-                    .fill(.ultraThinMaterial)
-
-                Image(systemName: "person.fill")
-                    .font(
-                        .system(
-                            size: 21,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(.blue)
-            }
-            .frame(width: 52, height: 52)
+            CachedProfileImage(
+                urlString: viewModel.user.profileImageUrl,
+                displayName: viewModel.user.name ?? "Housemate",
+                size: 52
+            )
             .overlay {
                 Circle()
                     .stroke(
@@ -414,6 +444,7 @@ struct HomeView: View {
             tasks: viewModel.todaysTasks,
             members: viewModel.members,
             showsAddButton: false,
+            usesThinMaterial: true,
             onToggleStatus: { task in
                 performAction(
                     successMessage: task.status == .completed
@@ -437,7 +468,10 @@ struct HomeView: View {
     // MARK: - Coming Up Card
 
     private var comingUpCard: some View {
-        ComingUpCardView(items: viewModel.comingUpItems)
+        ComingUpCardView(
+            items: viewModel.comingUpItems,
+            usesThinMaterial: true
+        )
         .dashboardShadow()
     }
 
@@ -447,6 +481,7 @@ struct HomeView: View {
         ShoppingCardView(
             items: viewModel.recentShoppingItems,
             showsAddButton: false,
+            usesThinMaterial: true,
             onTogglePurchased: { item in
                 performAction(
                     successMessage: item.isPurchased
@@ -474,6 +509,7 @@ struct HomeView: View {
             bills: viewModel.upcomingBills,
             title: "Upcoming Bills",
             showsAddButton: false,
+            usesThinMaterial: true,
             onMarkAsPaid: { bill in
                 performAction(
                     successMessage: "\(bill.title) marked as paid",
@@ -546,14 +582,14 @@ struct HomeView: View {
 
     private var backgroundGradient: some View {
         ZStack {
-            Color(.systemBackground)
+            Color(.secondarySystemBackground)
 
             LinearGradient(
                 colors: [
                     Color.blue.opacity(0.18),
                     Color.purple.opacity(0.10),
                     Color.cyan.opacity(0.08),
-                    Color(.systemBackground)
+                    Color(.secondarySystemBackground)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

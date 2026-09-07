@@ -93,6 +93,53 @@ struct HouseReminderModel: Identifiable, Codable, Equatable {
         return candidate
     }
 
+    func nextNotificationDate(
+        after referenceDate: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> Date? {
+        guard reminderAdvance != .none else {
+            return nil
+        }
+
+        var occurrence = nextOccurrence(
+            after: referenceDate,
+            calendar: calendar
+        )
+        var iterations = 0
+
+        while let currentOccurrence = occurrence,
+              iterations < 100 {
+            let occurrenceAtNineAM = calendar.date(
+                bySettingHour: 9,
+                minute: 0,
+                second: 0,
+                of: currentOccurrence
+            ) ?? currentOccurrence
+            let notificationDate = calendar.date(
+                byAdding: .day,
+                value: -reminderAdvance.daysBefore,
+                to: occurrenceAtNineAM
+            )
+
+            if let notificationDate,
+               notificationDate > referenceDate {
+                return notificationDate
+            }
+
+            guard recurrence != .never else {
+                return nil
+            }
+
+            occurrence = calendar.date(
+                byAdding: recurrence.dateComponents,
+                to: currentOccurrence
+            )
+            iterations += 1
+        }
+
+        return nil
+    }
+
     var eventParameters: [String: Any] {
         let dictionary: [String: Any?] = [
             "reminder_\(CodingKeys.reminderId.rawValue)": reminderId,
@@ -258,6 +305,49 @@ enum HouseReminderAdvance: String, Codable, CaseIterable {
         case .oneWeekBefore:
             return "1 week before"
         }
+    }
+
+    var daysBefore: Int {
+        switch self {
+        case .none, .sameDay:
+            return 0
+        case .oneDayBefore:
+            return 1
+        case .twoDaysBefore:
+            return 2
+        case .oneWeekBefore:
+            return 7
+        }
+    }
+
+    func notificationDate(
+        for dueDate: Date,
+        useNineAM: Bool,
+        now: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> Date? {
+        guard self != .none else {
+            return nil
+        }
+
+        let eventDate = useNineAM
+            ? calendar.date(
+                bySettingHour: 9,
+                minute: 0,
+                second: 0,
+                of: dueDate
+            ) ?? dueDate
+            : dueDate
+
+        guard let result = calendar.date(
+            byAdding: .day,
+            value: -daysBefore,
+            to: eventDate
+        ), result > now else {
+            return nil
+        }
+
+        return result
     }
 }
 

@@ -1,144 +1,151 @@
-//
-//  AddHousemateView.swift
-//  HouseMate
-//
-//  Created by Marcin Turek on 24/08/2026.
-//
-
-
-
 import SwiftUI
+import UIKit
 
 struct AddHousemateView: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    let onInvite: (
-        _ name: String,
-        _ email: String
-    ) -> Void
+    let household: HouseholdModel
 
-    @State private var name = ""
-    @State private var email = ""
-    @State private var hasAttemptedSubmit = false
+    @State private var didCopyCode = false
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField(
-                        "Name",
-                        text: $name
-                    )
-                    .textContentType(.name)
-                    .textInputAutocapitalization(.words)
-
-                    if hasAttemptedSubmit && trimmedName.isEmpty {
-                        FormValidationMessage(message: "Enter the housemate’s name.")
-                    }
-
-                    TextField(
-                        "Email",
-                        text: $email
-                    )
-                    .textContentType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.emailAddress)
-
-                    if hasAttemptedSubmit && !hasValidEmail {
-                        FormValidationMessage(message: "Enter a valid email address.")
-                    }
-                } header: {
-                    Text("Housemate")
-                } footer: {
-                    Text(
-                        "The invitation will be connected " +
-                        "to Firebase later."
-                    )
+            ScrollView {
+                VStack(spacing: 22) {
+                    invitationHeader
+                    inviteCodeCard
+                    sharingActions
+                    joiningInstructions
                 }
+                .padding(20)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Invite Housemate")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                cancellationToolbar
-                confirmationToolbar
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
             }
         }
     }
 
-    // MARK: - Toolbar
+    private var invitationHeader: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.2.badge.plus")
+                .font(.system(size: 38, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 76, height: 76)
+                .background(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: Circle()
+                )
 
-    private var cancellationToolbar: some ToolbarContent {
-        ToolbarItem(
-            placement: .cancellationAction
+            Text("Invite someone to \(household.name)")
+                .font(.title2.bold())
+                .multilineTextAlignment(.center)
+
+            Text("Share the code below with someone you trust.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+    }
+
+    private var inviteCodeCard: some View {
+        VStack(spacing: 14) {
+            Text("INVITE CODE")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+
+            Text(household.inviteCode)
+                .font(.system(size: 34, weight: .bold, design: .monospaced))
+                .tracking(6)
+                .foregroundStyle(.blue)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+
+            Button {
+                copyInviteCode()
+            } label: {
+                Label(
+                    didCopyCode ? "Code Copied" : "Copy Code",
+                    systemImage: didCopyCode ? "checkmark" : "doc.on.doc"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(didCopyCode ? .green : .blue)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
+        .background(cardBackground)
+    }
+
+    private var sharingActions: some View {
+        ShareLink(
+            item: inviteMessage,
+            subject: Text("Join my household on HouseMate")
         ) {
-            Button("Cancel") {
-                dismiss()
+            Label("Share Invitation", systemImage: "square.and.arrow.up")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(.blue, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var joiningInstructions: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("How to join", systemImage: "info.circle.fill")
+                .font(.headline)
+
+            Text("Open HouseMate, choose Join a Home and enter the invite code. The new housemate will appear automatically after joining.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(cardBackground)
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .fill(.background)
+            .shadow(color: .black.opacity(0.05), radius: 12, y: 5)
+    }
+
+    private var inviteMessage: String {
+        "Join \(household.name) on HouseMate using invite code \(household.inviteCode)."
+    }
+
+    private func copyInviteCode() {
+        UIPasteboard.general.string = household.inviteCode
+        HapticFeedback.actionSuccess()
+
+        withAnimation(.smooth) {
+            didCopyCode = true
+        }
+
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(.smooth) {
+                didCopyCode = false
             }
         }
-    }
-
-    private var confirmationToolbar: some ToolbarContent {
-        ToolbarItem(
-            placement: .confirmationAction
-        ) {
-            Button("Invite") {
-                inviteHousemate()
-            }
-        }
-    }
-
-    // MARK: - Validation
-
-    private var trimmedName: String {
-        name.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-    }
-
-    private var trimmedEmail: String {
-        email
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            .lowercased()
-    }
-
-    private var canInvite: Bool {
-        !trimmedName.isEmpty
-            && hasValidEmail
-    }
-
-    private var hasValidEmail: Bool {
-        trimmedEmail.contains("@")
-            && trimmedEmail.contains(".")
-    }
-
-    // MARK: - Invite
-
-    private func inviteHousemate() {
-        hasAttemptedSubmit = true
-
-        guard canInvite else {
-            HapticFeedback.validationError()
-            return
-        }
-
-        onInvite(
-            trimmedName,
-            trimmedEmail
-        )
-
-        dismiss()
     }
 }
 
-// MARK: - Preview
-
 #Preview {
-    AddHousemateView { name, email in
-        print(name)
-        print(email)
-    }
+    AddHousemateView(household: .mock)
 }

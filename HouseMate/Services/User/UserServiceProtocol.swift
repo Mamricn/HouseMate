@@ -30,6 +30,12 @@ protocol UserServiceProtocol: AnyObject {
     ) async throws
 
     func deleteUserData(userID: String) async throws
+
+    func updateProfileImageURL(
+        _ profileImageURL: String?,
+        userID: String,
+        householdID: String?
+    ) async throws
 }
 
 

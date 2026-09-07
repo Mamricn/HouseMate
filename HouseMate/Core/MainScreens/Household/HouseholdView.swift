@@ -274,7 +274,6 @@ struct HouseholdView: View {
                 alignment: .leading,
                 spacing: 20
             ) {
-                header
                 scheduleCard
                 shoppingCard
                 billsCard
@@ -295,27 +294,6 @@ struct HouseholdView: View {
             }
         }
         .scrollIndicators(.hidden)
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Household")
-                .font(
-                    .system(
-                        size: 30,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-
-            Text("Manage your home together")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 4)
-        .padding(.bottom, 8)
     }
 
     // MARK: - Schedule
@@ -609,14 +587,14 @@ struct HouseholdView: View {
 
     private var backgroundGradient: some View {
         ZStack {
-            Color(.systemBackground)
+            Color(.secondarySystemBackground)
 
             LinearGradient(
                 colors: [
                     Color.blue.opacity(0.18),
                     Color.purple.opacity(0.10),
                     Color.cyan.opacity(0.08),
-                    Color(.systemBackground)
+                    Color(.secondarySystemBackground)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

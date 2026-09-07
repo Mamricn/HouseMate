@@ -13,6 +13,7 @@ struct ShoppingCardView: View {
     let items: [ShoppingItemModel]
 
     var showsAddButton: Bool = true
+    var usesThinMaterial: Bool = true
 
     var onAdd: () -> Void = {}
     var onTogglePurchased: (ShoppingItemModel) -> Void = { _ in }
@@ -251,7 +252,7 @@ struct ShoppingCardView: View {
             cornerRadius: 24,
             style: .continuous
         )
-        .fill(.ultraThickMaterial)
+        .fill(usesThinMaterial ? Material.ultraThin : Material.ultraThick)
         .overlay {
             RoundedRectangle(
                 cornerRadius: 24,

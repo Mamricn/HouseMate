@@ -203,7 +203,7 @@ struct HouseholdSettingsView: View {
                 .blue.opacity(0.16),
                 .purple.opacity(0.10),
                 .cyan.opacity(0.08),
-                Color(.systemBackground)
+                Color(.secondarySystemBackground)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -514,39 +514,11 @@ struct HouseholdSettingsView: View {
     private func memberAvatar(
         _ member: HouseholdMemberModel
     ) -> some View {
-        if let profileImageUrl = member.profileImageUrl,
-           let url = URL(string: profileImageUrl) {
-            AsyncImage(url: url) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
-                avatarFallback(member)
-            }
-            .frame(width: 46, height: 46)
-            .clipShape(Circle())
-        } else {
-            avatarFallback(member)
-        }
-    }
-
-    private func avatarFallback(
-        _ member: HouseholdMemberModel
-    ) -> some View {
-        Circle()
-            .fill(
-                LinearGradient(
-                    colors: [.blue.opacity(0.85), .purple.opacity(0.75)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .frame(width: 46, height: 46)
-            .overlay {
-                Text(memberInitials(member))
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.white)
-            }
+        CachedProfileImage(
+            urlString: member.profileImageUrl,
+            displayName: member.displayName,
+            size: 46
+        )
     }
 
     private var cardBackground: some View {
@@ -572,19 +544,6 @@ struct HouseholdSettingsView: View {
     private var membersCountText: String {
         let count = viewModel.members.count
         return count == 1 ? "1 member" : "\(count) members"
-    }
-
-    private func memberInitials(
-        _ member: HouseholdMemberModel
-    ) -> String {
-        let initials = member.displayName
-            .split(separator: " ")
-            .prefix(2)
-            .compactMap(\.first)
-
-        return initials.isEmpty
-            ? "?"
-            : String(initials).uppercased()
     }
 
     private var ownershipPicker: some View {

@@ -56,7 +56,16 @@ final class FirebaseTaskService: TaskServiceProtocol {
     }
 
     func createTask(_ task: TaskModel) async throws {
-        let data = try Firestore.Encoder().encode(task)
+        var data = try Firestore.Encoder().encode(task)
+
+        if let dueDate = task.dueDate,
+           let advance = task.notificationAdvance,
+           let reminderAt = advance.notificationDate(
+            for: dueDate,
+            useNineAM: task.isAllDay
+           ) {
+            data["reminder_at"] = reminderAt
+        }
 
         try await tasksCollection(householdID: task.householdId)
             .document(task.taskId)

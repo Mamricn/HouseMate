@@ -57,7 +57,7 @@ final class FirebaseBillService: BillServiceProtocol {
     }
 
     func createBill(_ bill: BillModel) async throws {
-        let data = try Firestore.Encoder().encode(bill)
+        let data = try encodedData(for: bill)
 
         try await billsCollection(householdID: bill.householdId)
             .document(bill.billId)
@@ -79,7 +79,7 @@ final class FirebaseBillService: BillServiceProtocol {
         )
 
         if let nextBill {
-            let nextBillData = try Firestore.Encoder().encode(nextBill)
+            let nextBillData = try encodedData(for: nextBill)
             let nextBillReference = billsCollection(householdID: nextBill.householdId)
                 .document(nextBill.billId)
             batch.setData(nextBillData, forDocument: nextBillReference, merge: false)
@@ -99,6 +99,21 @@ final class FirebaseBillService: BillServiceProtocol {
             .collection("households")
             .document(householdID)
             .collection("bills")
+    }
+
+    private func encodedData(for bill: BillModel) throws -> [String: Any] {
+        var data = try Firestore.Encoder().encode(bill)
+
+        if let dueDate = bill.dueDate,
+           let advance = bill.notificationAdvance,
+           let reminderAt = advance.notificationDate(
+            for: dueDate,
+            useNineAM: true
+           ) {
+            data["reminder_at"] = reminderAt
+        }
+
+        return data
     }
 
     private func decode(_ snapshot: QuerySnapshot) throws -> [BillModel] {

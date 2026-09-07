@@ -125,11 +125,18 @@ struct HouseholdPollsCardView: View {
     private func creatorInformation(
         for poll: PollModel
     ) -> some View {
-        let creatorName = members.first {
+        let creator = members.first {
             $0.userId == poll.createdByUserId
-        }?.displayName ?? "Unknown member"
+        }
+        let creatorName = creator?.displayName ?? "Unknown member"
 
-        return HStack(alignment: .top) {
+        return HStack(alignment: .top, spacing: 10) {
+            CachedProfileImage(
+                urlString: creator?.profileImageUrl,
+                displayName: creatorName,
+                size: 36
+            )
+
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(creatorName) asked")
                     .font(.subheadline)
@@ -238,9 +245,13 @@ struct HouseholdPollsCardView: View {
                     cornerRadius: 12,
                     style: .continuous
                 )
-                .fill(
-                    Color(.secondarySystemBackground)
+                .fill(.ultraThinMaterial)
+
+                RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
                 )
+                .fill(Color.primary.opacity(0.035))
 
                 RoundedRectangle(
                     cornerRadius: 12,
@@ -397,7 +408,7 @@ struct HouseholdPollsCardView: View {
             cornerRadius: 24,
             style: .continuous
         )
-        .fill(.ultraThickMaterial)
+        .fill(.ultraThinMaterial)
         .overlay {
             RoundedRectangle(
                 cornerRadius: 24,

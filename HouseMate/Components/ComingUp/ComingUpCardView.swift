@@ -25,6 +25,7 @@ struct ComingUpItem: Identifiable, Equatable {
 struct ComingUpCardView: View {
 
     let items: [ComingUpItem]
+    var usesThinMaterial: Bool = true
 
     private let calendar = Calendar.autoupdatingCurrent
 
@@ -141,7 +142,7 @@ struct ComingUpCardView: View {
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .fill(.ultraThickMaterial)
+            .fill(usesThinMaterial ? Material.ultraThin : Material.ultraThick)
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .stroke(.white.opacity(0.85), lineWidth: 1)

@@ -14,9 +14,11 @@ struct MemberView: View {
     var body: some View {
         VStack(spacing: 6) {
             
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 38))
-                .foregroundStyle(.secondary)
+            CachedProfileImage(
+                urlString: member.profileImageUrl,
+                displayName: member.displayName,
+                size: 42
+            )
             
             Text(member.displayName)
                 .font(.caption)

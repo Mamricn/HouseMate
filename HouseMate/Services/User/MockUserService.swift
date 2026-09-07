@@ -79,6 +79,19 @@ final class MockUserService: UserServiceProtocol {
         users[userID] = nil
     }
 
+    func updateProfileImageURL(
+        _ profileImageURL: String?,
+        userID: String,
+        householdID: String?
+    ) async throws {
+        guard var user = users[userID] else {
+            throw UserServiceError.userNotFound
+        }
+
+        user.profileImageUrl = profileImageURL
+        users[userID] = user
+    }
+
     private var appVersion: String? {
         Bundle.main.object(
             forInfoDictionaryKey:

@@ -61,6 +61,12 @@ struct ScheduleTaskRowView: View {
 
             HStack(spacing: 5) {
                 if let member {
+                    CachedProfileImage(
+                        urlString: member.profileImageUrl,
+                        displayName: member.displayName,
+                        size: 18
+                    )
+
                     Text(member.displayName)
                 } else {
                     Text("Unassigned")

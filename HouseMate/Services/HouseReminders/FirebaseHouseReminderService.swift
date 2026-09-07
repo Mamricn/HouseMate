@@ -54,7 +54,12 @@ final class FirebaseHouseReminderService: HouseReminderServiceProtocol {
     }
 
     func createReminder(_ reminder: HouseReminderModel) async throws {
-        let data = try Firestore.Encoder().encode(reminder)
+        var data = try Firestore.Encoder().encode(reminder)
+
+        if let nextReminderAt = reminder.nextNotificationDate() {
+            data["next_reminder_at"] = nextReminderAt
+            data["time_zone_id"] = TimeZone.autoupdatingCurrent.identifier
+        }
 
         try await remindersCollection(householdID: reminder.householdId)
             .document(reminder.reminderId)

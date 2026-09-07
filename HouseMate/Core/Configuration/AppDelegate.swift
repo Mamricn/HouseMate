@@ -8,6 +8,7 @@
 
 import UIKit
 import FirebaseCore
+import FirebaseMessaging
 import UserNotifications
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
@@ -21,6 +22,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
         configureFirebase()
         UNUserNotificationCenter.current().delegate = self
+
+        if AppEnvironment.current.usesFirebase {
+            Messaging.messaging().delegate = self
+        }
 
         return true
     }
@@ -47,6 +52,44 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
 
         FirebaseApp.configure(options: options)
+    }
+}
+
+extension AppDelegate: MessagingDelegate {
+
+    func messaging(
+        _ messaging: Messaging,
+        didReceiveRegistration registrationID: String?
+    ) {
+        guard let registrationID else { return }
+
+        Task { @MainActor in
+            FirebaseRemoteNotificationService.shared
+                .receiveRegistrationID(registrationID)
+        }
+    }
+}
+
+extension AppDelegate {
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Messaging.messaging().apnsToken = deviceToken
+
+        #if DEBUG
+        print("APNs device token received.")
+        #endif
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        #if DEBUG
+        print("APNs registration failed: \(error.localizedDescription)")
+        #endif
     }
 }
 

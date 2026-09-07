@@ -13,6 +13,7 @@ struct BillsCardView: View {
 
     var title: String = "Upcoming Bills"
     var showsAddButton: Bool = true
+    var usesThinMaterial: Bool = true
 
     var onAdd: () -> Void = {}
     var onMarkAsPaid: (BillModel) -> Void = { _ in }
@@ -158,7 +159,7 @@ struct BillsCardView: View {
             cornerRadius: 24,
             style: .continuous
         )
-        .fill(.ultraThickMaterial)
+        .fill(usesThinMaterial ? Material.ultraThin : Material.ultraThick)
         .overlay {
             RoundedRectangle(
                 cornerRadius: 24,

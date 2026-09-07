@@ -109,18 +109,26 @@ final class FirebaseUserService: UserServiceProtocol {
             .collection("notifications")
             .getDocuments()
 
+        let deviceTokensSnapshot = try await userReference
+            .collection("device_tokens")
+            .getDocuments()
+
+        let childDocuments =
+            notificationsSnapshot.documents
+            + deviceTokensSnapshot.documents
+
         for startIndex in stride(
             from: 0,
-            to: notificationsSnapshot.documents.count,
+            to: childDocuments.count,
             by: 450
         ) {
             let endIndex = min(
                 startIndex + 450,
-                notificationsSnapshot.documents.count
+                childDocuments.count
             )
             let batch = database.batch()
 
-            for document in notificationsSnapshot.documents[
+            for document in childDocuments[
                 startIndex..<endIndex
             ] {
                 batch.deleteDocument(document.reference)
@@ -130,6 +138,33 @@ final class FirebaseUserService: UserServiceProtocol {
         }
 
         try await userReference.delete()
+    }
+
+    func updateProfileImageURL(
+        _ profileImageURL: String?,
+        userID: String,
+        householdID: String?
+    ) async throws {
+        let value: Any = profileImageURL ?? FieldValue.delete()
+        let batch = database.batch()
+
+        batch.updateData(
+            ["profile_image_url": value],
+            forDocument: usersCollection.document(userID)
+        )
+
+        if let householdID {
+            batch.updateData(
+                ["profile_image_url": value],
+                forDocument: database
+                    .collection("households")
+                    .document(householdID)
+                    .collection("members")
+                    .document(userID)
+            )
+        }
+
+        try await batch.commit()
     }
 
     private var appVersion: String? {

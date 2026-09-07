@@ -15,9 +15,11 @@ struct HouseholdBoardRowView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             
-            Circle()
-                .fill(.gray.opacity(0.2))
-                .frame(width: 42, height: 42)
+            CachedProfileImage(
+                urlString: user.profileImageUrl,
+                displayName: user.name ?? "Housemate",
+                size: 42
+            )
             
             VStack(alignment: .leading, spacing: 4) {
                 

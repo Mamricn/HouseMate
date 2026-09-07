@@ -100,6 +100,7 @@ struct NotificationModel: Identifiable, Codable, Equatable {
 enum NotificationType: String, Codable, CaseIterable {
     case taskAssigned
     case taskDue
+    case newBill
     case billDue
     case newPoll
     case houseReminder
@@ -114,7 +115,7 @@ enum NotificationType: String, Codable, CaseIterable {
         case .taskDue:
             return "checklist"
 
-        case .billDue:
+        case .newBill, .billDue:
             return "creditcard.fill"
 
         case .newPoll:

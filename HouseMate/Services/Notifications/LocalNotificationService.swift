@@ -78,7 +78,7 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
         guard reminder.reminderAdvance != .none,
               preferenceEnabled(key: "houseReminderNotificationsEnabled"),
               await isAuthorized,
-              let notificationDate = nextNotificationDate(for: reminder) else {
+              let notificationDate = reminder.nextNotificationDate() else {
             return
         }
 
@@ -110,21 +110,12 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
     }
 
     func synchronizeHouseReminders(_ reminders: [HouseReminderModel]) async throws {
-        guard await isAuthorized else {
-            return
-        }
-
-        let activeIdentifiers = Set(reminders.map { notificationIdentifier(reminderID: $0.reminderId) })
         let pendingRequests = await notificationCenter.pendingNotificationRequests()
-        let staleIdentifiers = pendingRequests
+        let localReminderIdentifiers = pendingRequests
             .map(\.identifier)
-            .filter { $0.hasPrefix(houseReminderPrefix) && !activeIdentifiers.contains($0) }
+            .filter { $0.hasPrefix(houseReminderPrefix) }
 
-        notificationCenter.removePendingNotificationRequests(withIdentifiers: staleIdentifiers)
-
-        for reminder in reminders {
-            try await scheduleHouseReminder(reminder)
-        }
+        notificationCenter.removePendingNotificationRequests(withIdentifiers: localReminderIdentifiers)
     }
 
     func scheduleTask(_ task: TaskModel, currentUserID: String) async throws {
@@ -138,7 +129,10 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
               advance != .none,
               let dueDate = task.dueDate,
               await isAuthorized,
-              let notificationDate = notificationDate(for: dueDate, advance: advance, useNineAM: task.isAllDay) else {
+              let notificationDate = advance.notificationDate(
+                for: dueDate,
+                useNineAM: task.isAllDay
+              ) else {
             return
         }
 
@@ -161,14 +155,9 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
     }
 
     func synchronizeTasks(_ tasks: [TaskModel], currentUserID: String) async throws {
-        let relevantTasks = tasks.filter {
-            $0.assignedToUserId == currentUserID && $0.status == .pending && $0.notificationAdvance != nil
-        }
-        try await synchronize(prefix: taskPrefix, identifiers: relevantTasks.map { "\(taskPrefix)\($0.taskId)" })
-
-        for task in relevantTasks {
-            try await scheduleTask(task, currentUserID: currentUserID)
-        }
+        _ = tasks
+        _ = currentUserID
+        try await synchronize(prefix: taskPrefix, identifiers: [])
     }
 
     func scheduleBill(_ bill: BillModel) async throws {
@@ -181,7 +170,10 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
               advance != .none,
               let dueDate = bill.dueDate,
               await isAuthorized,
-              let notificationDate = notificationDate(for: dueDate, advance: advance, useNineAM: true) else {
+              let notificationDate = advance.notificationDate(
+                for: dueDate,
+                useNineAM: true
+              ) else {
             return
         }
 
@@ -204,12 +196,8 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
     }
 
     func synchronizeBills(_ bills: [BillModel]) async throws {
-        let relevantBills = bills.filter { $0.status != .paid && $0.notificationAdvance != nil }
-        try await synchronize(prefix: billPrefix, identifiers: relevantBills.map { "\(billPrefix)\($0.billId)" })
-
-        for bill in relevantBills {
-            try await scheduleBill(bill)
-        }
+        _ = bills
+        try await synchronize(prefix: billPrefix, identifiers: [])
     }
 
     func applyPreferences() async {
@@ -236,43 +224,6 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
         }
     }
 
-    private func nextNotificationDate(for reminder: HouseReminderModel) -> Date? {
-        let calendar = Calendar.autoupdatingCurrent
-        let now = Date.now
-        var occurrence = reminder.nextOccurrence(after: now, calendar: calendar)
-        var iterations = 0
-
-        while let currentOccurrence = occurrence, iterations < 100 {
-            let occurrenceAtNineAM = calendar.date(
-                bySettingHour: 9,
-                minute: 0,
-                second: 0,
-                of: currentOccurrence
-            ) ?? currentOccurrence
-
-            guard let notificationDate = calendar.date(
-                byAdding: .day,
-                value: -reminder.reminderAdvance.daysBefore,
-                to: occurrenceAtNineAM
-            ) else {
-                return nil
-            }
-
-            if notificationDate > now {
-                return notificationDate
-            }
-
-            guard reminder.recurrence != .never else {
-                return nil
-            }
-
-            occurrence = calendar.date(byAdding: reminder.recurrence.dateComponents, to: currentOccurrence)
-            iterations += 1
-        }
-
-        return nil
-    }
-
     private func notificationIdentifier(reminderID: String) -> String {
         "\(houseReminderPrefix)\(reminderID)"
     }
@@ -290,17 +241,6 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
         case .oneWeekBefore:
             return "Scheduled in 1 week."
         }
-    }
-
-    private func notificationDate(for date: Date, advance: HouseReminderAdvance, useNineAM: Bool) -> Date? {
-        let calendar = Calendar.autoupdatingCurrent
-        let eventDate = useNineAM
-            ? calendar.date(bySettingHour: 9, minute: 0, second: 0, of: date) ?? date
-            : date
-        guard let result = calendar.date(byAdding: .day, value: -advance.daysBefore, to: eventDate), result > .now else {
-            return nil
-        }
-        return result
     }
 
     private func addNotification(identifier: String, title: String, body: String, date: Date, userInfo: [AnyHashable: Any]) async throws {
@@ -331,21 +271,5 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
     private func preferenceEnabled(key: String) -> Bool {
         let defaults = UserDefaults.standard
         return defaults.object(forKey: key) == nil ? true : defaults.bool(forKey: key)
-    }
-}
-
-private extension HouseReminderAdvance {
-
-    var daysBefore: Int {
-        switch self {
-        case .none, .sameDay:
-            return 0
-        case .oneDayBefore:
-            return 1
-        case .twoDaysBefore:
-            return 2
-        case .oneWeekBefore:
-            return 7
-        }
     }
 }

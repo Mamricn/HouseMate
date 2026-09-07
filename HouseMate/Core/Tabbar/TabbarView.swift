@@ -189,6 +189,9 @@ struct TabbarView: View {
                 onManageAccount: {
                     router.navigate(to: .accountSettings)
                 },
+                onManageProfile: {
+                    router.navigate(to: .profileSettings)
+                },
                 onNotificationPreferencesChanged: {
                     await homeViewModel.applyNotificationPreferences()
                 },
@@ -224,6 +227,39 @@ struct TabbarView: View {
                     router.reset()
                 }
             )
+
+        case .profileSettings:
+            ProfileSettingsView(
+                viewModel: ProfileSettingsViewModel(
+                    user: homeViewModel.user,
+                    interactor: interactor
+                ),
+                onProfileImageChanged: { imageURL in
+                    applyProfileImageURL(imageURL)
+                }
+            )
+        }
+    }
+
+    private func applyProfileImageURL(_ imageURL: String?) {
+        let userID = homeViewModel.user.id
+        homeViewModel.user.profileImageUrl = imageURL
+        householdViewModel.currentUser.profileImageUrl = imageURL
+        housematesViewModel.currentUser.profileImageUrl = imageURL
+
+        for index in homeViewModel.members.indices
+            where homeViewModel.members[index].userId == userID {
+            homeViewModel.members[index].profileImageUrl = imageURL
+        }
+
+        for index in householdViewModel.members.indices
+            where householdViewModel.members[index].userId == userID {
+            householdViewModel.members[index].profileImageUrl = imageURL
+        }
+
+        for index in housematesViewModel.members.indices
+            where housematesViewModel.members[index].userId == userID {
+            housematesViewModel.members[index].profileImageUrl = imageURL
         }
     }
 
@@ -235,6 +271,7 @@ struct TabbarView: View {
                 GeometryReader { geometry in
                     CustomTabBar2(
                         size: geometry.size,
+                        barTint: Color.primary.opacity(0.08),
                         activeTab: $activeTab
                     )
                     .overlay {
@@ -263,6 +300,10 @@ struct TabbarView: View {
                             }
                         }
                     }
+                    .background(
+                        .ultraThinMaterial,
+                        in: Capsule()
+                    )
                     .glassEffect(
                         .regular.interactive(),
                         in: .capsule
@@ -309,6 +350,10 @@ struct TabbarView: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .background(
+            .ultraThinMaterial,
+            in: Circle()
+        )
         .glassEffect(
             .regular.interactive(),
             in: .capsule
@@ -626,15 +671,8 @@ struct TabbarView: View {
     // MARK: - Housemates Forms
 
     private var housemateSheet: some View {
-        AddHousemateView { name, email in
-            withAnimation {
-                housematesViewModel.addHousemate(
-                    name: name,
-                    email: email
-                )
-            }
-        }
-        .presentationDetents([.medium])
+        AddHousemateView(household: household)
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 

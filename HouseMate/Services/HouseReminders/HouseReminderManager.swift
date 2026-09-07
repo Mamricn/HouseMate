@@ -74,20 +74,6 @@ final class HouseReminderManager {
         }
         sortReminders()
         reminders = Array(reminders.prefix(30))
-
-        guard reminder.reminderAdvance != .none else {
-            return
-        }
-
-        do {
-            let isAuthorized = try await notificationService.requestAuthorization()
-
-            if isAuthorized {
-                try await notificationService.scheduleHouseReminder(reminder)
-            }
-        } catch {
-            // The reminder is saved even if local notification scheduling fails.
-        }
     }
 
     func deleteReminder(_ reminder: HouseReminderModel, currentUserID: String, ownerUserID: String) async throws {

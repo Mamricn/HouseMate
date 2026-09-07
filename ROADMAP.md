@@ -24,6 +24,13 @@ notes can remain in `FEATURES.md`.
 
 ## 2. Household ownership and member management
 
+- [x] Share and copy a household invite code from Add a Member
+- [ ] Add a Universal Link in the form `https://<domain>/join/{inviteCode}`
+- [ ] Open Join a Home with the invite code filled in from the link
+- [ ] Preserve a pending invitation through sign-in or account creation
+- [ ] Configure Associated Domains and host `apple-app-site-association`
+- [ ] Add a web/App Store fallback when HouseMate is not installed
+- [ ] Replace the shared plain-code invitation with the Universal Link
 - [x] Add `ownerUserId` while preserving the historical creator
 - [x] Keep older household documents compatible by treating their creator as owner
 - [x] Use ownership internally for permissions without displaying an Owner badge
@@ -49,18 +56,18 @@ notes can remain in `FEATURES.md`.
 
 ## 4. Profile photos
 
-- [ ] Add photo selection from the photo library
-- [ ] Add preview and crop support
-- [ ] Resize and compress images before upload
-- [ ] Upload avatars to Firebase Storage
-- [ ] Store the avatar reference or URL in the user profile
-- [ ] Provide an initials-based fallback avatar
-- [ ] Allow users to replace and remove their own photo
-- [ ] Display avatars in the member list, posts, polls and assignment pickers
-- [ ] Add upload progress and error states
-- [ ] Cache downloaded images to avoid unnecessary network usage
-- [ ] Delete the previous image after replacement and on account deletion
-- [ ] Restrict image type and maximum file size
+- [x] Add photo selection from the photo library
+- [x] Add preview and crop support
+- [x] Resize and compress images before upload
+- [x] Upload avatars to Firebase Storage
+- [x] Store the avatar reference or URL in the user profile
+- [x] Provide an initials-based fallback avatar
+- [x] Allow users to replace and remove their own photo
+- [x] Display avatars in the member list, posts, polls and assignment pickers
+- [x] Add loading and error states
+- [x] Cache downloaded images to avoid unnecessary network usage
+- [x] Delete the previous image after replacement and on account deletion
+- [x] Restrict image type and maximum file size
 
 ## 5. Account management
 
@@ -69,14 +76,14 @@ notes can remain in `FEATURES.md`.
 - [x] Require recent authentication for sensitive operations
 - [x] Handle account deletion when the user owns a household
 - [ ] Remove or anonymise user references in retained history where appropriate
-- [ ] Delete the user profile, device tokens and avatar (profile and notifications done; tokens/avatar follow with those features)
+- [ ] Delete the user profile, device tokens and avatar (profile and avatar done; tokens follow with advanced notifications)
 - [x] Delete the Firebase Authentication account only after data cleanup succeeds
 - [ ] Add a clear recovery path if account deletion fails partway through
 
 ## 6. Advanced notifications
 
 - [ ] Configure APNs and Firebase Cloud Messaging
-- [ ] Store, refresh and remove device tokens per signed-in device
+- [x] Store, refresh and remove device registrations per signed-in device
 - [ ] Add server-triggered notifications for activity created by another member
 - [ ] Notify users about assigned tasks
 - [ ] Notify users about upcoming bills and reminders
@@ -119,7 +126,7 @@ See `FEATURES.md` for the detailed notification policy.
 ## 9. Backend security and data quality
 
 - [ ] Finalise Firestore Security Rules after roles and ownership are stable
-- [ ] Add Firebase Storage Rules for profile images
+- [x] Add Firebase Storage Rules for profile images
 - [ ] Add Firebase App Check
 - [ ] Validate privileged operations on the backend
 - [ ] Add and document required Firestore indexes

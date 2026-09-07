@@ -56,16 +56,6 @@ final class TaskManager {
         }
         sortTasks()
 
-        if task.notificationAdvance != nil,
-           task.assignedToUserId == currentUserID {
-            do {
-                let authorized = try await notificationService.requestAuthorization()
-                if authorized, let currentUserID {
-                    try await notificationService.scheduleTask(task, currentUserID: currentUserID)
-                }
-            } catch { }
-        }
-
         synchronizeNotifications()
     }
 

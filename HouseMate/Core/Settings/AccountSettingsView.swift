@@ -83,6 +83,10 @@ final class AccountSettingsViewModel {
     private func deleteAccount(
         mode: AccountDeletionMode
     ) async throws {
+        if user.profileImageUrl != nil {
+            try await interactor.removeProfileImage(for: user)
+        }
+
         switch mode {
         case .accountOnly:
             guard !isHouseholdOwner else {
@@ -157,7 +161,7 @@ struct AccountSettingsView: View {
             colors: [
                 .blue.opacity(0.14),
                 .purple.opacity(0.09),
-                Color(.systemBackground)
+                Color(.secondarySystemBackground)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -167,20 +171,11 @@ struct AccountSettingsView: View {
 
     private var accountCard: some View {
         HStack(spacing: 15) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 58, height: 58)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                }
+            CachedProfileImage(
+                urlString: viewModel.user.profileImageUrl,
+                displayName: viewModel.user.name ?? "Housemate",
+                size: 58
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(viewModel.user.name ?? "Housemate")

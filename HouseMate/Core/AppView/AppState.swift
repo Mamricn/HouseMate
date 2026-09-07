@@ -93,11 +93,20 @@ final class AppState {
     }
 
     func signOut() {
-        do {
+        Task {
             errorMessage = nil
-            try interactor.signOut()
-        } catch {
-            errorMessage = error.localizedDescription
+
+            if let userID = currentUser?.id {
+                await interactor.unregisterRemoteNotifications(
+                    userID: userID
+                )
+            }
+
+            do {
+                try interactor.signOut()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -159,6 +168,24 @@ final class AppState {
             }
 
             currentUser = user
+
+            Task {
+                do {
+                    try await interactor.registerRemoteNotifications(
+                        for: user
+                    )
+                    #if DEBUG
+                    print("Push registration flow completed.")
+                    #endif
+                } catch {
+                    #if DEBUG
+                    print(
+                        "Push registration failed: "
+                        + error.localizedDescription
+                    )
+                    #endif
+                }
+            }
 
             if let householdID = user.householdId {
                 guard let household = try await interactor.fetchHousehold(

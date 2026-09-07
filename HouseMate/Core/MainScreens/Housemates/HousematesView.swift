@@ -27,6 +27,10 @@ final class HousematesViewModel {
         householdOwnerUserID == currentUser.id
     }
 
+    var household: HouseholdModel? {
+        interactor.currentHousehold
+    }
+
     var posts: [BoardPostModel] {
         interactor.boardPosts
     }
@@ -65,38 +69,6 @@ final class HousematesViewModel {
             householdOwnerUserID: HouseholdModel.mock.ownerUserId,
             interactor: CoreInteractor(container: container)
         )
-    }
-
-    // MARK: - Housemate Actions
-
-    func addHousemate(
-        name: String,
-        email: String
-    ) {
-        guard let householdId = currentUser.householdId else {
-            return
-        }
-
-        let userId = UUID().uuidString
-
-        let newUser = UserModel(
-            userId: userId,
-            createdAt: .now,
-            email: email,
-            name: name,
-            householdId: householdId
-        )
-
-        let newMember = HouseholdMemberModel(
-            memberId: UUID().uuidString,
-            householdId: householdId,
-            userId: userId,
-            joinedAt: .now,
-            displayName: name
-        )
-
-        users.append(newUser)
-        members.append(newMember)
     }
 
     // MARK: - Board Actions
@@ -329,7 +301,6 @@ struct HousematesView: View {
                 alignment: .leading,
                 spacing: 20
             ) {
-                header
                 membersCard
                 boardCard
                 pollsCard
@@ -351,27 +322,6 @@ struct HousematesView: View {
             }
         }
         .scrollIndicators(.hidden)
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Housemates")
-                .font(
-                    .system(
-                        size: 30,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-
-            Text("Connect with everyone at home")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 4)
-        .padding(.bottom, 8)
     }
 
     // MARK: - Members
@@ -512,21 +462,18 @@ struct HousematesView: View {
     }
 
     private var housemateSheet: some View {
-        AddHousemateView { name, email in
-            withAnimation {
-                viewModel.addHousemate(
-                    name: name,
-                    email: email
+        Group {
+            if let household = viewModel.household {
+                AddHousemateView(household: household)
+            } else {
+                ContentUnavailableView(
+                    "Household unavailable",
+                    systemImage: "house.slash",
+                    description: Text("Close this screen and try again.")
                 )
             }
-
-            showToast(
-                message: "\(name) invited",
-                systemImage: "person.badge.plus",
-                color: .green
-            )
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 
@@ -663,14 +610,14 @@ struct HousematesView: View {
 
     private var backgroundGradient: some View {
         ZStack {
-            Color(.systemBackground)
+            Color(.secondarySystemBackground)
 
             LinearGradient(
                 colors: [
                     Color.purple.opacity(0.16),
                     Color.blue.opacity(0.12),
                     Color.cyan.opacity(0.07),
-                    Color(.systemBackground)
+                    Color(.secondarySystemBackground)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

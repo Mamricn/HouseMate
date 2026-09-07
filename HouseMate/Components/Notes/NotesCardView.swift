@@ -58,7 +58,7 @@ struct NotesCardView: View {
                 cornerRadius: 24,
                 style: .continuous
             )
-            .fill(.ultraThickMaterial)
+            .fill(.ultraThinMaterial)
             .overlay {
                 RoundedRectangle(
                     cornerRadius: 24,

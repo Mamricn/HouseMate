@@ -18,6 +18,7 @@ struct SettingsView: View {
     let onSignOut: () -> Void
     var onManageHousehold: () -> Void = {}
     var onManageAccount: () -> Void = {}
+    var onManageProfile: () -> Void = {}
     var onNotificationPreferencesChanged: () async -> Void = {}
     var onSendTestNotification: () async -> Bool = { false }
 
@@ -62,43 +63,42 @@ struct SettingsView: View {
 
     private var profileSection: some View {
         Section("Profile") {
-            HStack(spacing: 14) {
-                profileImage
+            Button {
+                onManageProfile()
+            } label: {
+                HStack(spacing: 14) {
+                    profileImage
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(user.name ?? "Unknown User")
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(user.name ?? "Unknown User")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
 
-                    if let email = user.email {
-                        Text(email)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        if let email = user.email {
+                            Text(email)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
+                .padding(.vertical, 6)
             }
-            .padding(.vertical, 6)
+            .buttonStyle(.plain)
         }
     }
 
     private var profileImage: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.blue,
-                            Color.purple
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            Image(systemName: "person.fill")
-                .font(.system(size: 23, weight: .semibold))
-                .foregroundStyle(.white)
-        }
-        .frame(width: 54, height: 54)
+        CachedProfileImage(
+            urlString: user.profileImageUrl,
+            displayName: user.name ?? "Housemate",
+            size: 54
+        )
     }
 
     // MARK: - Household

@@ -31,6 +31,12 @@ struct TaskRowView: View {
                 HStack(spacing: 6) {
                     
                     if let member {
+                        CachedProfileImage(
+                            urlString: member.profileImageUrl,
+                            displayName: member.displayName,
+                            size: 20
+                        )
+
                         Text(member.displayName)
                     }
                     

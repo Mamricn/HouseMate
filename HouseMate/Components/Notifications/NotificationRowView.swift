@@ -75,7 +75,7 @@ struct NotificationRowView: View {
         case .taskDue:
             return .blue
 
-        case .billDue:
+        case .newBill, .billDue:
             return .orange
 
         case .newPoll:

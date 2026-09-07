@@ -113,17 +113,51 @@ struct AddChoreView: View {
                     FormValidationMessage(message: "Add a household member before creating a chore.")
                 }
             } else {
-                Picker(
-                    "Housemate",
-                    selection: $assignedToUserId
-                ) {
+                Menu {
                     ForEach(members) { member in
-                        Text(member.displayName)
-                            .tag(member.userId)
+                        Button {
+                            assignedToUserId = member.userId
+                        } label: {
+                            if member.userId == assignedToUserId {
+                                Label(
+                                    member.displayName,
+                                    systemImage: "checkmark"
+                                )
+                            } else {
+                                Text(member.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Text("Housemate")
+                            .foregroundStyle(.primary)
+
+                        Spacer()
+
+                        if let selectedMember {
+                            CachedProfileImage(
+                                urlString: selectedMember.profileImageUrl,
+                                displayName: selectedMember.displayName,
+                                size: 28
+                            )
+
+                            Text(selectedMember.displayName)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
+                .buttonStyle(.plain)
             }
         }
+    }
+
+    private var selectedMember: HouseholdMemberModel? {
+        members.first { $0.userId == assignedToUserId }
     }
 
     // MARK: - Schedule

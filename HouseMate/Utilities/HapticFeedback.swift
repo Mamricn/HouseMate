@@ -12,4 +12,9 @@ enum HapticFeedback {
         UINotificationFeedbackGenerator()
             .notificationOccurred(.error)
     }
+
+    static func actionSuccess() {
+        UINotificationFeedbackGenerator()
+            .notificationOccurred(.success)
+    }
 }

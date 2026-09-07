@@ -13,6 +13,7 @@ struct TaskCardView: View {
     let members: [HouseholdMemberModel]
 
     var showsAddButton: Bool = true
+    var usesThinMaterial: Bool = true
     var onToggleStatus: (TaskModel) -> Void = { _ in }
 
     var body: some View {
@@ -33,7 +34,7 @@ struct TaskCardView: View {
                 cornerRadius: 24,
                 style: .continuous
             )
-            .fill(.ultraThickMaterial)
+            .fill(usesThinMaterial ? Material.ultraThin : Material.ultraThick)
             .overlay {
                 RoundedRectangle(
                     cornerRadius: 24,

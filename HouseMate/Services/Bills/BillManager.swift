@@ -61,13 +61,6 @@ final class BillManager {
         sortBills()
         trimBills()
 
-        if bill.notificationAdvance != nil {
-            do {
-                let authorized = try await notificationService.requestAuthorization()
-                if authorized { try await notificationService.scheduleBill(bill) }
-            } catch { }
-        }
-
         synchronizeNotifications()
     }
 
