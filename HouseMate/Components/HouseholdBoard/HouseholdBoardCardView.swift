@@ -43,7 +43,7 @@ struct HouseholdBoardCardView: View {
 
     private var header: some View {
         HStack {
-            Text("Household Board")
+            Text("Board")
                 .font(.title3)
                 .fontWeight(.semibold)
 
@@ -63,73 +63,55 @@ struct HouseholdBoardCardView: View {
     // MARK: - Posts List
 
     private var postsList: some View {
-        List {
-            ForEach(sortedPosts) { post in
-                if let user = user(for: post) {
-                    HouseholdBoardRowView(
-                        post: post,
-                        user: user
-                    )
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 4,
-                            leading: 0,
-                            bottom: 4,
-                            trailing: 0
-                        )
-                    )
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .onAppear {
-                        if post.id == sortedPosts.last?.id,
-                           canLoadMore,
-                           !isLoadingMore {
-                            onLoadMore()
+        ScrollView {
+            LazyVStack(spacing: 4) {
+                ForEach(sortedPosts) { post in
+                    if let user = user(for: post) {
+                        HouseMateSwipeRow(
+                            leadingAction: deleteAction(for: post),
+                            trailingAction: nil
+                        ) {
+                            HouseholdBoardRowView(post: post, user: user)
+                                .padding(.vertical, 2)
+                                .onAppear {
+                                    if post.id == sortedPosts.last?.id,
+                                       canLoadMore,
+                                       !isLoadingMore {
+                                        onLoadMore()
+                                    }
+                                }
                         }
                     }
-
-                    // Użytkownik może usunąć tylko swój post
-                    .swipeActions(
-                        edge: .leading,
-                        allowsFullSwipe: false
-                    ) {
-                        if post.createdByUserId == currentUserId {
-                            deleteButton(for: post)
-                        }
-                    }
-                    .roundedSwipeActions()
                 }
-            }
 
-            if isLoadingMore {
-                HStack {
-                    Spacer()
+                if isLoadingMore {
                     ProgressView()
-                    Spacer()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 }
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
-        .frame(height: 180)
+        .frame(
+            height: min(
+                max(CGFloat(posts.count) * 52, 52),
+                180
+            )
+        )
     }
 
     // MARK: - Delete Action
 
-    private func deleteButton(
-        for post: BoardPostModel
-    ) -> some View {
-        Button(role: .destructive) {
+    private func deleteAction(for post: BoardPostModel) -> HouseMateSwipeAction? {
+        guard post.createdByUserId == currentUserId else { return nil }
+
+        return HouseMateSwipeAction(
+            accessibilityLabel: "Delete post",
+            systemImage: "trash.fill",
+            color: .red
+        ) {
             onDelete(post)
-        } label: {
-            Label(
-                "Delete",
-                systemImage: "trash.fill"
-            )
         }
     }
 

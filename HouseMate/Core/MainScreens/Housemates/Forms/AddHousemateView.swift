@@ -12,11 +12,10 @@ struct AddHousemateView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 22) {
+                VStack(spacing: 18) {
                     invitationHeader
                     inviteCodeCard
                     sharingActions
-                    joiningInstructions
                 }
                 .padding(20)
             }
@@ -104,21 +103,6 @@ struct AddHousemateView: View {
         .buttonStyle(.plain)
     }
 
-    private var joiningInstructions: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("How to join", systemImage: "info.circle.fill")
-                .font(.headline)
-
-            Text("Open HouseMate, choose Join a Home and enter the invite code. The new housemate will appear automatically after joining.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(cardBackground)
-    }
-
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
             .fill(.background)
@@ -126,7 +110,7 @@ struct AddHousemateView: View {
     }
 
     private var inviteMessage: String {
-        "Join \(household.name) on HouseMate using invite code \(household.inviteCode)."
+        "You're invited to join \(household.name) on HouseMate. Open HouseMate, choose Join a Home, and enter invite code: \(household.inviteCode)."
     }
 
     private func copyInviteCode() {

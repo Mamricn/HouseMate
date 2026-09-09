@@ -21,36 +21,36 @@ struct AppToastView: View {
     let toast: AppToast
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Image(systemName: toast.systemImage)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(toast.color)
 
             Text(toast.message)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-
-            Spacer()
+                .font(.footnote)
+                .fontWeight(.medium)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background {
             Capsule()
-                .fill(.ultraThickMaterial)
+                .fill(.ultraThinMaterial)
                 .overlay {
                     Capsule()
                         .stroke(
-                            .white.opacity(0.35),
-                            lineWidth: 1
+                            Color.primary.opacity(0.08),
+                            lineWidth: 0.75
                         )
                 }
         }
         .shadow(
-            color: .black.opacity(0.15),
-            radius: 14,
-            y: 7
+            color: .black.opacity(0.08),
+            radius: 8,
+            y: 3
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 24)
     }
 }
 

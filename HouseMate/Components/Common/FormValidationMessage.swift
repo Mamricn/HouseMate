@@ -17,3 +17,10 @@ struct FormValidationMessage: View {
             .accessibilityLabel("Error: \(message)")
     }
 }
+
+#Preview("Validation Message") {
+    FormValidationMessage(
+        message: "Complete the required fields before publishing."
+    )
+    .padding()
+}

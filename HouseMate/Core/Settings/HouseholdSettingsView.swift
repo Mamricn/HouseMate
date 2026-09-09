@@ -447,11 +447,10 @@ struct HouseholdSettingsView: View {
         color: Color
     ) -> some View {
         HStack(spacing: 13) {
-            Image(systemName: systemImage)
-                .font(.headline)
-                .foregroundStyle(color)
-                .frame(width: 42, height: 42)
-                .background(color.opacity(0.10), in: Circle())
+            HouseMateSymbolView(
+                systemName: systemImage,
+                color: color
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
@@ -875,5 +874,20 @@ private struct DeleteHouseholdConfirmationView: View {
             guard didDelete else { return }
             onDeleted()
         }
+    }
+}
+
+#Preview("Household Settings") {
+    let container = DependencyContainer.make(environment: .mock)
+    let interactor = CoreInteractor(container: container)
+
+    NavigationStack {
+        HouseholdSettingsView(
+            viewModel: HouseholdSettingsViewModel(
+                household: .mock,
+                currentUser: UserModel.mockList[0],
+                interactor: interactor
+            )
+        )
     }
 }

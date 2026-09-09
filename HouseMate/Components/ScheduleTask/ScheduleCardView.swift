@@ -151,89 +151,42 @@ struct ScheduleCardView: View {
     // MARK: - Tasks List
 
     private var tasksList: some View {
-        List {
-            ForEach(selectedDateTasks) { task in
+        ScrollView {
+            LazyVStack(spacing: 4) {
+                ForEach(selectedDateTasks) { task in
                 let member = members.first {
                     $0.userId == task.assignedToUserId
                 }
 
-                ScheduleTaskRowView(
-                    task: task,
-                    member: member
-                )
-                .listRowInsets(
-                    EdgeInsets(
-                        top: 2,
-                        leading: 0,
-                        bottom: 2,
-                        trailing: 0
-                    )
-                )
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-                // Swipe w prawo — zmiana statusu
-                .swipeActions(
-                    edge: .leading,
-                    allowsFullSwipe: true
-                ) {
-                    deleteButton(for: task)
-                   
+                    HouseMateSwipeRow(
+                        leadingAction: deleteAction(for: task),
+                        trailingAction: nil
+                    ) {
+                        ScheduleTaskRowView(task: task, member: member)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                HapticFeedback.selection()
+                                onToggleStatus(task)
+                            }
+                            .padding(.vertical, 2)
+                    }
                 }
-
-                // Swipe w lewo — usunięcie
-                .swipeActions(
-                    edge: .trailing,
-                    allowsFullSwipe: false
-                ) {
-                    toggleStatusButton(for: task)
-                }
-                .roundedSwipeActions()
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: 220)
     }
 
-    // MARK: - Toggle Status Action
-
-    private func toggleStatusButton(
-        for task: TaskModel
-    ) -> some View {
-        Button {
-            onToggleStatus(task)
-        } label: {
-            Label(
-                task.status == .completed
-                    ? "Mark Pending"
-                    : "Complete",
-                systemImage: task.status == .completed
-                    ? "arrow.uturn.backward.circle"
-                    : "checkmark.circle.fill"
-            )
-        }
-        .tint(
-            task.status == .completed
-                ? .orange
-                : .green
-        )
-    }
-
     // MARK: - Delete Action
 
-    private func deleteButton(
-        for task: TaskModel
-    ) -> some View {
-        Button(role: .destructive) {
+    private func deleteAction(for task: TaskModel) -> HouseMateSwipeAction {
+        HouseMateSwipeAction(
+            accessibilityLabel: "Delete task",
+            systemImage: "trash.fill",
+            color: .red
+        ) {
             onDelete(task)
-        } label: {
-            Label(
-                "Delete",
-                systemImage: "trash.fill"
-            )
         }
     }
 

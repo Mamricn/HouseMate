@@ -99,6 +99,18 @@ See `FEATURES.md` for the detailed notification policy.
 
 ## 7. UX consistency and resilience
 
+### Reminder and bills expansion
+
+- [ ] Open a saved house reminder from its row
+- [ ] Add reminder details with notes, next date, time, recurrence and notification timing
+- [ ] Allow reminders to be edited, deleted and completed from their details
+- [ ] Open a bill from its row and show its complete details
+- [ ] Record `paidAt` when a bill is marked as paid
+- [ ] Add a dedicated Bills screen with week, month, six-month and year filters
+- [ ] Add bill totals, category breakdown, previous-period comparison and recurring-cost summary
+- [ ] Add clear charts only where they make spending easier to understand
+- [ ] Consider budgets, receipt photos, search and CSV export after the core dashboard
+
 - [ ] Review every form for consistent validation behaviour
 - [ ] Prevent repeated Create, Save and Delete submissions
 - [ ] Add consistent loading, empty, success and error states

@@ -260,6 +260,22 @@ struct CoreInteractor {
         householdManager.clearCurrentHousehold()
     }
 
+    func updateAutomaticWeeklyAssignment(
+        isEnabled: Bool,
+        requestedByUserID: String
+    ) async throws {
+        try await householdManager.updateAutomaticWeeklyAssignment(
+            isEnabled: isEnabled,
+            requestedByUserID: requestedByUserID
+        )
+    }
+
+    func runWeeklyAssignmentNow(requestedByUserID: String) async throws {
+        try await householdManager.runWeeklyAssignmentNow(
+            requestedByUserID: requestedByUserID
+        )
+    }
+
     func removeHouseholdMember(
         userID: String,
         requestedByUserID: String

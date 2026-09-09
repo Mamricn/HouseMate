@@ -108,6 +108,31 @@ final class MockHouseholdService: HouseholdServiceProtocol {
             }
     }
 
+    func updateAutomaticWeeklyAssignment(
+        householdID: String,
+        isEnabled: Bool
+    ) async throws {
+        guard var household = households[householdID] else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        household.automaticWeeklyAssignmentEnabled = isEnabled
+        households[householdID] = household
+    }
+
+    func runWeeklyAssignmentNow(
+        householdID: String,
+        requestedByUserID: String
+    ) async throws {
+        guard let household = households[householdID] else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        guard household.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+    }
+
     func removeMember(
         householdID: String,
         memberUserID: String,

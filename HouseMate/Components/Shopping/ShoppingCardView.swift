@@ -90,43 +90,24 @@ struct ShoppingCardView: View {
     // MARK: - List
 
     private var shoppingList: some View {
-        List {
-            ForEach(sortedItems) { item in
-                ShoppingItemRowView(item: item)
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 4,
-                            leading: 0,
-                            bottom: 4,
-                            trailing: 0
-                        )
-                    )
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-
-                    // Delete po lewej
-                    .swipeActions(
-                        edge: .leading,
-                        allowsFullSwipe: false
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                ForEach(sortedItems) { item in
+                    HouseMateSwipeRow(
+                        leadingAction: deleteAction(for: item),
+                        trailingAction: nil
                     ) {
-                        if onDelete != nil {
-                            deleteButton(for: item)
-                        }
+                        ShoppingItemRowView(item: item)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                HapticFeedback.selection()
+                                onTogglePurchased(item)
+                            }
+                            .padding(.vertical, 4)
                     }
-                
-
-                    // Purchased po prawej
-                    .swipeActions(
-                        edge: .trailing,
-                        allowsFullSwipe: true
-                    ) {
-                        togglePurchasedButton(for: item)
-                    }
-                    .roundedSwipeActions()
+                }
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: 180)
@@ -134,38 +115,15 @@ struct ShoppingCardView: View {
 
     // MARK: - Actions
 
-    private func togglePurchasedButton(
-        for item: ShoppingItemModel
-    ) -> some View {
-        Button {
-            onTogglePurchased(item)
-        } label: {
-            Label(
-                item.isPurchased
-                    ? "Add Back"
-                    : "Purchased",
-                systemImage: item.isPurchased
-                    ? "arrow.uturn.backward.circle"
-                    : "cart.badge.checkmark"
-            )
-        }
-        .tint(
-            item.isPurchased
-                ? .orange
-                : .green
-        )
-    }
+    private func deleteAction(for item: ShoppingItemModel) -> HouseMateSwipeAction? {
+        guard onDelete != nil else { return nil }
 
-    private func deleteButton(
-        for item: ShoppingItemModel
-    ) -> some View {
-        Button(role: .destructive) {
+        return HouseMateSwipeAction(
+            accessibilityLabel: "Delete \(item.name)",
+            systemImage: "trash.fill",
+            color: .red
+        ) {
             onDelete?(item)
-        } label: {
-            Label(
-                "Delete",
-                systemImage: "trash.fill"
-            )
         }
     }
 

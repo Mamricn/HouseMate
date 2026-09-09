@@ -166,6 +166,7 @@ service cloud.firestore {
             'member_ids',
             'name',
             'invite_code',
+            'automatic_weekly_assignment_enabled',
             'deletion_state'
           ])
         && ownerId(request.resource.data)
@@ -204,6 +205,21 @@ service cloud.firestore {
 
         allow delete: if isSelf(memberUserId)
           || isHouseholdOwner(householdId);
+      }
+
+      match /developer_commands/{commandId} {
+        allow create: if isHouseholdOwner(householdId)
+          && request.resource.data.get('command', '')
+            == 'run_weekly_assignment'
+          && request.resource.data.get('requested_by_user_id', '')
+            == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'command',
+            'requested_by_user_id',
+            'created_at'
+          ]);
+
+        allow read, update, delete: if false;
       }
 
       match /tasks/{taskId} {

@@ -12,6 +12,7 @@ import SwiftUI
 struct AppView: View {
 
     @State private var appState: AppState
+    @State private var showsAnimatedLaunch = true
     private let interactor: CoreInteractor
 
     init() {
@@ -48,6 +49,12 @@ struct AppView: View {
     var body: some View {
         ZStack {
             screenContent
+
+            if showsAnimatedLaunch {
+                AnimatedLaunchView()
+                    .transition(.opacity)
+                    .zIndex(10)
+            }
         }
         .animation(
             .smooth,
@@ -55,6 +62,15 @@ struct AppView: View {
         )
         .task {
             await appState.bootstrap()
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(1.55))
+
+            guard !Task.isCancelled else { return }
+
+            withAnimation(.easeOut(duration: 0.35)) {
+                showsAnimatedLaunch = false
+            }
         }
         .alert(
             "Something went wrong",
@@ -132,51 +148,7 @@ struct AppView: View {
     }
 
     private var loadingView: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    .blue,
-                    .teal,
-                    .blue.opacity(0.08),
-                    .clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                Image(systemName: "house.fill")
-                    .font(
-                        .system(
-                            size: 34,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .frame(width: 72, height: 72)
-                    .background {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        .blue,
-                                        .cyan
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    }
-
-                ProgressView()
-                    .controlSize(.large)
-
-                Text("Preparing your home...")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
+        PreparingHomeView()
     }
 
     private var errorBinding: Binding<Bool> {

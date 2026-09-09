@@ -185,3 +185,9 @@ struct ProfileImageCropView: View {
         }
     }
 }
+
+#Preview("Profile Image Crop") {
+    ProfileImageCropView(
+        image: UIImage(systemName: "person.crop.square.fill")!
+    ) { _ in }
+}

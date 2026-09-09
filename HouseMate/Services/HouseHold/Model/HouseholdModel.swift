@@ -28,6 +28,7 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
     var createdByUserId: String
     var ownerUserId: String
     var memberIds: [String]
+    var automaticWeeklyAssignmentEnabled: Bool
     
     
     init(
@@ -37,7 +38,8 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
         inviteCode: String,
         createdByUserId: String,
         ownerUserId: String? = nil,
-        memberIds: [String] = []
+        memberIds: [String] = [],
+        automaticWeeklyAssignmentEnabled: Bool = false
     ) {
         self.householdId = householdId
         self.createdAt = createdAt
@@ -46,6 +48,7 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
         self.createdByUserId = createdByUserId
         self.ownerUserId = ownerUserId ?? createdByUserId
         self.memberIds = memberIds
+        self.automaticWeeklyAssignmentEnabled = automaticWeeklyAssignmentEnabled
     }
     
     
@@ -57,6 +60,7 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
         case createdByUserId = "created_by_user_id"
         case ownerUserId = "owner_user_id"
         case memberIds = "member_ids"
+        case automaticWeeklyAssignmentEnabled = "automatic_weekly_assignment_enabled"
     }
 
     init(from decoder: Decoder) throws {
@@ -92,6 +96,10 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
             [String].self,
             forKey: .memberIds
         ) ?? []
+        automaticWeeklyAssignmentEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .automaticWeeklyAssignmentEnabled
+        ) ?? false
     }
 
     func isOwner(userID: String) -> Bool {
@@ -108,7 +116,8 @@ struct HouseholdModel: Identifiable, Codable, Equatable {
             "household_\(CodingKeys.inviteCode.rawValue)": inviteCode,
             "household_\(CodingKeys.createdByUserId.rawValue)": createdByUserId,
             "household_\(CodingKeys.ownerUserId.rawValue)": ownerUserId,
-            "household_\(CodingKeys.memberIds.rawValue)": memberIds
+            "household_\(CodingKeys.memberIds.rawValue)": memberIds,
+            "household_\(CodingKeys.automaticWeeklyAssignmentEnabled.rawValue)": automaticWeeklyAssignmentEnabled
         ]
         
         return dict.compactMapValues { $0 }

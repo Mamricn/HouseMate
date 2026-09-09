@@ -473,7 +473,7 @@ struct HousematesView: View {
                 )
             }
         }
-        .presentationDetents([.large])
+        .presentationDetents([.height(520)])
         .presentationDragIndicator(.visible)
     }
 

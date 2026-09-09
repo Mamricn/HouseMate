@@ -268,3 +268,17 @@ struct ProfileSettingsView: View {
         }
     }
 }
+
+#Preview("Profile Settings") {
+    let container = DependencyContainer.make(environment: .mock)
+    let interactor = CoreInteractor(container: container)
+
+    NavigationStack {
+        ProfileSettingsView(
+            viewModel: ProfileSettingsViewModel(
+                user: .mock,
+                interactor: interactor
+            )
+        )
+    }
+}

@@ -18,9 +18,20 @@ struct ShoppingItemRowView: View {
                   ? "checkmark.circle.fill"
                   : "circle")
                 .font(.title3)
+                .foregroundStyle(
+                    item.isPurchased
+                        ? Color.green
+                        : Color.primary
+                )
             
             Text(item.name)
                 .font(.footnote)
+                .strikethrough(item.isPurchased)
+                .foregroundStyle(
+                    item.isPurchased
+                        ? Color.secondary
+                        : Color.primary
+                )
             
             Spacer()
             
@@ -32,6 +43,7 @@ struct ShoppingItemRowView: View {
         }
         .padding(.vertical, 4)
         .frame(minHeight: 40)
+        .animation(.snappy(duration: 0.25), value: item.isPurchased)
     }
 }
 

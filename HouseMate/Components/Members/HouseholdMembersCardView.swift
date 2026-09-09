@@ -35,7 +35,7 @@ struct HouseholdMembersCardView: View {
 
     private var header: some View {
         HStack {
-            Text("Household Members")
+            Text("Members")
                 .font(.title3)
                 .fontWeight(.semibold)
 
@@ -75,7 +75,7 @@ struct HouseholdMembersCardView: View {
                 .font(.system(size: 28))
                 .foregroundStyle(.blue)
 
-            Text("No household members")
+            Text("No members yet")
                 .font(.subheadline)
                 .fontWeight(.semibold)
 

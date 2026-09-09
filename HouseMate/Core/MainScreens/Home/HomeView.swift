@@ -56,7 +56,7 @@ final class HomeViewModel {
 
     // MARK: - User
 
-    var userName: String {
+    var firstName: String {
         let name = user.name?
             .trimmingCharacters(
                 in: .whitespacesAndNewlines
@@ -66,7 +66,10 @@ final class HomeViewModel {
             return "there"
         }
 
-        return name
+        return name.split(whereSeparator: \Character.isWhitespace)
+            .first
+            .map(String.init)
+            ?? name
     }
 
     var formattedToday: String {
@@ -76,22 +79,6 @@ final class HomeViewModel {
                 .day(.twoDigits)
                 .month(.twoDigits)
         )
-    }
-
-    var greeting: String {
-        switch calendar.component(.hour, from: .now) {
-        case 5..<12:
-            return "Good morning"
-
-        case 12..<17:
-            return "Good afternoon"
-
-        case 17..<22:
-            return "Good evening"
-
-        default:
-            return "Good night"
-        }
     }
 
     // MARK: - Today's Tasks
@@ -319,6 +306,12 @@ struct HomeView: View {
 
     @State private var toast: AppToast?
     @State private var isHeaderElevated = false
+    @State private var pullDistance: CGFloat = 0
+    @State private var isRefreshing = false
+    @State private var isRefreshArmed = false
+    @State private var didTriggerRefresh = false
+
+    private let refreshThreshold: CGFloat = 72
 
     var body: some View {
         ZStack {
@@ -358,23 +351,103 @@ struct HomeView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 35)
             }
-            .refreshable {
-                await viewModel.refreshData()
+            .scrollIndicators(.hidden)
+            .overlay(alignment: .top) {
+                customRefreshIndicator
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                max(0, -geometry.contentOffset.y)
+            } action: { oldPullDistance, newPullDistance in
+                pullDistance = newPullDistance
 
-                if let errorMessage = viewModel.actionState.errorMessage {
-                    showToast(
-                        message: errorMessage,
-                        systemImage: "exclamationmark.triangle.fill",
-                        color: .red
-                    )
+                if newPullDistance < 4, !isRefreshing {
+                    didTriggerRefresh = false
+                    isRefreshArmed = false
+                }
+
+                if newPullDistance >= refreshThreshold,
+                   !isRefreshArmed,
+                   !didTriggerRefresh,
+                   !isRefreshing {
+                    isRefreshArmed = true
+                    HapticFeedback.selection()
+                }
+
+                if oldPullDistance >= refreshThreshold,
+                   newPullDistance < refreshThreshold,
+                   isRefreshArmed,
+                   !didTriggerRefresh,
+                   !isRefreshing {
+                    isRefreshArmed = false
+                    didTriggerRefresh = true
+                    refreshHome()
                 }
             }
-            .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: Bool.self) { geometry in
                 geometry.contentOffset.y > 4
             } action: { _, isScrolled in
                 isHeaderElevated = isScrolled
             }
+        }
+    }
+
+    private var customRefreshIndicator: some View {
+        let progress = min(pullDistance / refreshThreshold, 1)
+
+        return Group {
+            refreshHouseIcon(progress: progress)
+        }
+        .padding(9)
+        .background(.ultraThinMaterial, in: Circle())
+        .opacity(pullDistance > 8 || isRefreshing ? 1 : 0)
+        .offset(y: 8)
+        .animation(.easeOut(duration: 0.18), value: pullDistance)
+        .animation(.easeInOut(duration: 0.2), value: isRefreshing)
+        .allowsHitTesting(false)
+    }
+
+    private func refreshHouseIcon(progress: CGFloat) -> some View {
+        ZStack {
+            Image(systemName: "house")
+                .foregroundStyle(.secondary.opacity(0.55))
+
+            Image(systemName: "house.fill")
+                .foregroundStyle(.blue)
+                .mask(alignment: .bottom) {
+                    Rectangle()
+                        .scaleEffect(
+                            y: isRefreshing ? 1 : progress,
+                            anchor: .bottom
+                        )
+                }
+                .symbolEffect(.bounce, value: isRefreshArmed)
+                .symbolEffect(
+                    .pulse,
+                    options: .repeating,
+                    isActive: isRefreshing
+                )
+        }
+        .font(.system(size: 18, weight: .semibold))
+        .frame(width: 22, height: 22)
+        .scaleEffect(isRefreshing ? 1 : 0.78 + progress * 0.22)
+        .animation(.snappy(duration: 0.24), value: isRefreshArmed)
+    }
+
+    private func refreshHome() {
+        isRefreshing = true
+
+        Task {
+            await viewModel.refreshData()
+
+            if let errorMessage = viewModel.actionState.errorMessage {
+                showToast(
+                    message: errorMessage,
+                    systemImage: "exclamationmark.triangle.fill",
+                    color: .red
+                )
+            }
+
+            isRefreshing = false
         }
     }
 
@@ -385,7 +458,7 @@ struct HomeView: View {
             profileButton
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(viewModel.greeting), \(viewModel.userName)")
+                Text("Hi, \(viewModel.firstName)")
                     .font(
                         .system(
                             size: 19,
@@ -396,7 +469,7 @@ struct HomeView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
 
-                Text("It’s \(viewModel.formattedToday)")
+                Text(viewModel.formattedToday)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -442,7 +515,6 @@ struct HomeView: View {
     private var tasksCard: some View {
         TaskCardView(
             tasks: viewModel.todaysTasks,
-            members: viewModel.members,
             showsAddButton: false,
             usesThinMaterial: true,
             onToggleStatus: { task in

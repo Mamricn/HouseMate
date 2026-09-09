@@ -51,7 +51,7 @@ struct HouseholdPollsCardView: View {
 
     private var header: some View {
         HStack {
-            Text("Household Polls")
+            Text("Polls")
                 .font(.title3)
                 .fontWeight(.semibold)
 

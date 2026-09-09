@@ -179,6 +179,7 @@ struct TabbarView: View {
         case .settings:
             SettingsView(
                 user: homeViewModel.user,
+                household: interactor.currentHousehold ?? household,
                 onSignOut: {
                     router.reset()
                     onSignOut()
@@ -197,6 +198,27 @@ struct TabbarView: View {
                 },
                 onSendTestNotification: {
                     await homeViewModel.sendTestNotification()
+                },
+                onAutomaticWeeklyAssignmentChanged: { isEnabled in
+                    do {
+                        try await interactor.updateAutomaticWeeklyAssignment(
+                            isEnabled: isEnabled,
+                            requestedByUserID: homeViewModel.user.userId
+                        )
+                        return true
+                    } catch {
+                        return false
+                    }
+                },
+                onRunWeeklyAssignmentNow: {
+                    do {
+                        try await interactor.runWeeklyAssignmentNow(
+                            requestedByUserID: homeViewModel.user.userId
+                        )
+                        return true
+                    } catch {
+                        return false
+                    }
                 }
             )
 
@@ -266,52 +288,47 @@ struct TabbarView: View {
     // MARK: - Custom Tab Bar
 
     private var customTabBarView: some View {
-        GlassEffectContainer(spacing: 10) {
-            HStack(spacing: 10) {
-                GeometryReader { geometry in
-                    CustomTabBar2(
-                        size: geometry.size,
-                        barTint: Color.primary.opacity(0.08),
-                        activeTab: $activeTab
-                    )
-                    .overlay {
-                        HStack(spacing: 0) {
-                            ForEach(
-                                CustomTab.allCases,
-                                id: \.rawValue
-                            ) { tab in
-                                VStack {
-                                    Image(
-                                        systemName: tab.symbol
-                                    )
-                                    .font(.title3)
-
-                                    Text(tab.rawValue)
-                                        .font(.system(size: 10))
-                                        .fontWeight(.medium)
-                                }
-                                .symbolVariant(.fill)
-                                .foregroundStyle(
-                                    activeTab == tab
-                                        ? .blue
-                                        : .primary
+        HStack(spacing: 10) {
+            GeometryReader { geometry in
+                CustomTabBar2(
+                    size: geometry.size,
+                    barTint: Color.primary.opacity(0.08),
+                    activeTab: $activeTab
+                )
+                .overlay {
+                    HStack(spacing: 0) {
+                        ForEach(
+                            CustomTab.allCases,
+                            id: \.rawValue
+                        ) { tab in
+                            VStack {
+                                Image(
+                                    systemName: tab.symbol
                                 )
-                                .frame(maxWidth: .infinity)
+                                .font(.title3)
+
+                                Text(tab.rawValue)
+                                    .font(.system(size: 10))
+                                    .fontWeight(.medium)
                             }
+                            .symbolVariant(.fill)
+                            .foregroundStyle(
+                                activeTab == tab
+                                    ? .blue
+                                    : .primary
+                            )
+                            .frame(maxWidth: .infinity)
                         }
                     }
-                    .background(
-                        .ultraThinMaterial,
-                        in: Capsule()
-                    )
-                    .glassEffect(
-                        .regular.interactive(),
-                        in: .capsule
-                    )
                 }
-
-                actionButton
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(Color.primary.opacity(0.09), lineWidth: 0.75)
+                }
             }
+
+            actionButton
         }
         .frame(height: 55)
 
@@ -354,10 +371,11 @@ struct TabbarView: View {
             .ultraThinMaterial,
             in: Circle()
         )
-        .glassEffect(
-            .regular.interactive(),
-            in: .capsule
-        )
+        .overlay {
+            Circle()
+                .stroke(Color.primary.opacity(0.09), lineWidth: 0.75)
+        }
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
         .animation(
             .smooth(
                 duration: 0.55,
@@ -596,7 +614,8 @@ struct TabbarView: View {
             dueDate,
             isAllDay,
             category,
-            notificationAdvance in
+            notificationAdvance,
+            participatesInWeeklyRotation in
 
             performAction(
                 state: householdViewModel.actionState,
@@ -610,7 +629,8 @@ struct TabbarView: View {
                     dueDate: dueDate,
                     isAllDay: isAllDay,
                     category: category,
-                    notificationAdvance: notificationAdvance
+                    notificationAdvance: notificationAdvance,
+                    participatesInWeeklyRotation: participatesInWeeklyRotation
                 )
                 }
             )
@@ -672,7 +692,7 @@ struct TabbarView: View {
 
     private var housemateSheet: some View {
         AddHousemateView(household: household)
-        .presentationDetents([.large])
+        .presentationDetents([.height(520)])
         .presentationDragIndicator(.visible)
     }
 

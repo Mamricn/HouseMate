@@ -110,6 +110,41 @@ final class HouseholdManager {
         currentMembers = []
     }
 
+    func updateAutomaticWeeklyAssignment(
+        isEnabled: Bool,
+        requestedByUserID: String
+    ) async throws {
+        guard let currentHousehold else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        guard currentHousehold.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        try await householdService.updateAutomaticWeeklyAssignment(
+            householdID: currentHousehold.householdId,
+            isEnabled: isEnabled
+        )
+
+        self.currentHousehold?.automaticWeeklyAssignmentEnabled = isEnabled
+    }
+
+    func runWeeklyAssignmentNow(requestedByUserID: String) async throws {
+        guard let currentHousehold else {
+            throw HouseholdServiceError.householdNotFound
+        }
+
+        guard currentHousehold.isOwner(userID: requestedByUserID) else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        try await householdService.runWeeklyAssignmentNow(
+            householdID: currentHousehold.householdId,
+            requestedByUserID: requestedByUserID
+        )
+    }
+
     func removeMember(
         userID: String,
         requestedByUserID: String

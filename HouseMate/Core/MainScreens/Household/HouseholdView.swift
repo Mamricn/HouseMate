@@ -57,7 +57,8 @@ final class HouseholdViewModel {
         dueDate: Date,
         isAllDay: Bool,
         category: TaskCategory,
-        notificationAdvance: HouseReminderAdvance
+        notificationAdvance: HouseReminderAdvance,
+        participatesInWeeklyRotation: Bool
     ) async -> Bool {
         guard let householdId = currentUser.householdId else {
             return false
@@ -75,7 +76,8 @@ final class HouseholdViewModel {
             isAllDay: isAllDay,
             status: .pending,
             category: category,
-            notificationAdvance: notificationAdvance == .none ? nil : notificationAdvance
+            notificationAdvance: notificationAdvance == .none ? nil : notificationAdvance,
+            participatesInWeeklyRotation: participatesInWeeklyRotation
         )
 
         return await actionState.perform {
@@ -449,7 +451,8 @@ struct HouseholdView: View {
             dueDate,
             isAllDay,
             category,
-            notificationAdvance in
+            notificationAdvance,
+            participatesInWeeklyRotation in
 
             performAction(
                 successMessage: "\(title) scheduled",
@@ -463,7 +466,8 @@ struct HouseholdView: View {
                     dueDate: dueDate,
                     isAllDay: isAllDay,
                     category: category,
-                    notificationAdvance: notificationAdvance
+                    notificationAdvance: notificationAdvance,
+                    participatesInWeeklyRotation: participatesInWeeklyRotation
                 )
                 }
             )

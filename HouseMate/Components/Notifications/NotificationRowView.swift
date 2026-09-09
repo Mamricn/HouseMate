@@ -54,17 +54,12 @@ struct NotificationRowView: View {
     // MARK: - Icon
 
     private var notificationIcon: some View {
-        Image(systemName: notification.type.systemImage)
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(notificationColor)
-            .frame(width: 40, height: 40)
-            .background {
-                RoundedRectangle(
-                    cornerRadius: 13,
-                    style: .continuous
-                )
-                .fill(notificationColor.opacity(0.12))
-            }
+        HouseMateSymbolView(
+            systemName: notification.type.systemImage,
+            color: notificationColor,
+            size: 40,
+            symbolSize: 17
+        )
     }
 
     private var notificationColor: Color {

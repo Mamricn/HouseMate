@@ -45,7 +45,7 @@ struct HouseRemindersCardView: View {
 
     private var header: some View {
         HStack {
-            Text("House Reminders")
+            Text("Reminders")
                 .font(.title3)
                 .fontWeight(.semibold)
 
@@ -65,38 +65,34 @@ struct HouseRemindersCardView: View {
     // MARK: - Reminders List
 
     private var remindersList: some View {
-        List {
-            ForEach(sortedReminders) { reminder in
-                reminderRow(reminder)
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 3,
-                            leading: 0,
-                            bottom: 3,
-                            trailing: 0
-                        )
-                    )
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-
-                    // Delete po lewej stronie
-                    .swipeActions(
-                        edge: .leading,
-                        allowsFullSwipe: false
+        ScrollView {
+            LazyVStack(spacing: 6) {
+                ForEach(sortedReminders) { reminder in
+                    HouseMateSwipeRow(
+                        leadingAction: deleteAction(for: reminder),
+                        trailingAction: nil
                     ) {
-                        if canDelete(reminder),
-                           onDelete != nil {
-                            deleteButton(for: reminder)
-                        }
+                        reminderRow(reminder)
+                            .padding(.vertical, 3)
                     }
-                    .roundedSwipeActions()
+                }
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: 220)
+    }
+
+    private func deleteAction(for reminder: HouseReminderModel) -> HouseMateSwipeAction? {
+        guard canDelete(reminder), onDelete != nil else { return nil }
+
+        return HouseMateSwipeAction(
+            accessibilityLabel: "Delete reminder",
+            systemImage: "trash.fill",
+            color: .red
+        ) {
+            onDelete?(reminder)
+        }
     }
 
     // MARK: - Reminder Row
@@ -148,24 +144,10 @@ struct HouseRemindersCardView: View {
     private func reminderIcon(
         for reminder: HouseReminderModel
     ) -> some View {
-        Image(
-            systemName: reminder.category.systemImage
+        HouseMateSymbolView(
+            systemName: reminder.category.systemImage,
+            color: categoryColor(reminder.category)
         )
-        .font(.system(size: 18, weight: .semibold))
-        .foregroundStyle(
-            categoryColor(reminder.category)
-        )
-        .frame(width: 42, height: 42)
-        .background {
-            RoundedRectangle(
-                cornerRadius: 14,
-                style: .continuous
-            )
-            .fill(
-                categoryColor(reminder.category)
-                    .opacity(0.12)
-            )
-        }
     }
 
     // MARK: - Delete Action

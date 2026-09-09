@@ -15,19 +15,24 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
 
     let user: UserModel
+    let household: HouseholdModel?
     let onSignOut: () -> Void
     var onManageHousehold: () -> Void = {}
     var onManageAccount: () -> Void = {}
     var onManageProfile: () -> Void = {}
     var onNotificationPreferencesChanged: () async -> Void = {}
     var onSendTestNotification: () async -> Bool = { false }
+    var onAutomaticWeeklyAssignmentChanged: (Bool) async -> Bool = { _ in false }
+    var onRunWeeklyAssignmentNow: () async -> Bool = { false }
 
 #if DEVELOPMENT
     @State private var isSendingTestNotification = false
+    @State private var isRunningWeeklyAssignment = false
+    @State private var weeklyAssignmentResult: String?
 #endif
 
-    @AppStorage("automaticWeeklyAssignment")
-    private var automaticWeeklyAssignment = false
+    @State private var automaticWeeklyAssignment = false
+    @State private var isUpdatingAutomaticAssignment = false
 
     @AppStorage("taskNotificationsEnabled")
     private var taskNotificationsEnabled = true
@@ -57,6 +62,19 @@ struct SettingsView: View {
                 }
             }
         }
+#if DEVELOPMENT
+        .alert(
+            "Weekly Assignment",
+            isPresented: Binding(
+                get: { weeklyAssignmentResult != nil },
+                set: { if !$0 { weeklyAssignmentResult = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(weeklyAssignmentResult ?? "")
+        }
+#endif
     }
 
     // MARK: - Profile
@@ -122,16 +140,62 @@ struct SettingsView: View {
 
             Toggle(
                 "Automatic Weekly Assignment",
-                isOn: $automaticWeeklyAssignment
+                isOn: Binding(
+                    get: { automaticWeeklyAssignment },
+                    set: { updateAutomaticWeeklyAssignment(to: $0) }
+                )
             )
+            .disabled(!canManageAutomaticAssignment || isUpdatingAutomaticAssignment)
+
+#if DEVELOPMENT
+            Button {
+                runWeeklyAssignmentNow()
+            } label: {
+                if isRunningWeeklyAssignment {
+                    ProgressView().frame(maxWidth: .infinity)
+                } else {
+                    Text("Run Weekly Assignment Now")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .disabled(
+                !canManageAutomaticAssignment
+                    || !automaticWeeklyAssignment
+                    || isRunningWeeklyAssignment
+            )
+#endif
         } header: {
             Text("Household")
         } footer: {
             Text(
-                automaticWeeklyAssignment
+                !canManageAutomaticAssignment
+                    ? "Only the household owner can change weekly assignments."
+                    : automaticWeeklyAssignment
                     ? "Chores will be fairly rotated between housemates each week."
                     : "Chores are assigned manually."
             )
+        }
+        .task {
+            automaticWeeklyAssignment = household?.automaticWeeklyAssignmentEnabled ?? false
+        }
+    }
+
+    private var canManageAutomaticAssignment: Bool {
+        guard let household else { return false }
+        return household.isOwner(userID: user.userId)
+    }
+
+    private func updateAutomaticWeeklyAssignment(to isEnabled: Bool) {
+        let previousValue = automaticWeeklyAssignment
+        automaticWeeklyAssignment = isEnabled
+        isUpdatingAutomaticAssignment = true
+
+        Task {
+            let didSave = await onAutomaticWeeklyAssignmentChanged(isEnabled)
+            if !didSave {
+                automaticWeeklyAssignment = previousValue
+            }
+            isUpdatingAutomaticAssignment = false
         }
     }
 
@@ -211,6 +275,18 @@ struct SettingsView: View {
             isSendingTestNotification = false
         }
     }
+
+    private func runWeeklyAssignmentNow() {
+        isRunningWeeklyAssignment = true
+
+        Task {
+            let didStart = await onRunWeeklyAssignmentNow()
+            weeklyAssignmentResult = didStart
+                ? "The rotation command was sent. Changes will appear shortly."
+                : "The rotation could not be started. Please try again."
+            isRunningWeeklyAssignment = false
+        }
+    }
 #endif
 
     // MARK: - About
@@ -279,6 +355,7 @@ struct SettingsView: View {
 #Preview {
     SettingsView(
         user: UserModel.mockList[0],
+        household: .mock,
         onSignOut: {}
     )
 }

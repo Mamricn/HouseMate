@@ -1,5 +1,10 @@
 import {initializeApp} from "firebase-admin/app";
-import {FieldValue, getFirestore, Timestamp} from "firebase-admin/firestore";
+import {
+  DocumentSnapshot,
+  FieldValue,
+  getFirestore,
+  Timestamp,
+} from "firebase-admin/firestore";
 import {getMessaging} from "firebase-admin/messaging";
 import {setGlobalOptions} from "firebase-functions";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
@@ -20,6 +25,16 @@ type TaskDocument = {
   assigned_to_user_id?: string;
   created_by_user_id?: string;
   status?: string;
+  due_date?: Timestamp;
+  reminder_at?: Timestamp;
+  participates_in_weekly_rotation?: boolean;
+};
+
+type HouseholdDocument = {
+  member_ids?: string[];
+  owner_user_id?: string;
+  created_by_user_id?: string;
+  weekly_assignment_last_run_week?: string;
 };
 
 type PollDocument = {
@@ -411,6 +426,212 @@ export const notifyBillCreated = onDocumentCreated(
     });
   }
 );
+
+/** Rotates opted-in chores fairly between household members every Monday. */
+export const rotateWeeklyChores = onSchedule(
+  {
+    schedule: "5 0 * * 1",
+    timeZone: "Europe/London",
+    maxInstances: 1,
+  },
+  async () => {
+    const now = DateTime.now().setZone("Europe/London");
+    const weekStart = now.startOf("week");
+    const weekKey = weekStart.toFormat("kkkk-'W'WW");
+    const epochWeek = Math.floor(weekStart.toMillis() / 604800000);
+    const database = getFirestore();
+    const households = await database.collection("households")
+      .where("automatic_weekly_assignment_enabled", "==", true)
+      .get();
+
+    for (const householdSnapshot of households.docs) {
+      await rotateHouseholdChores({
+        householdSnapshot,
+        weekStart,
+        weekKey,
+        epochWeek,
+        recordScheduledRun: true,
+      });
+    }
+  }
+);
+
+/** Runs weekly assignment immediately after an owner sends a Dev command. */
+export const runWeeklyAssignmentCommand = onDocumentCreated(
+  "households/{householdId}/developer_commands/{commandId}",
+  async (event) => {
+    const commandSnapshot = event.data;
+    if (!commandSnapshot) {
+      return;
+    }
+
+    const command = commandSnapshot.data();
+    const householdId = event.params.householdId;
+    const householdSnapshot = await getFirestore()
+      .collection("households")
+      .doc(householdId)
+      .get();
+    const household = householdSnapshot.data() as
+      HouseholdDocument | undefined;
+    const ownerUserId = household?.owner_user_id ??
+      household?.created_by_user_id;
+
+    try {
+      if (command.command !== "run_weekly_assignment" ||
+          command.requested_by_user_id !== ownerUserId) {
+        logger.warn("Rejected weekly assignment command", {
+          householdId,
+          commandId: commandSnapshot.id,
+        });
+        return;
+      }
+
+      const now = DateTime.now().setZone("Europe/London");
+      const weekStart = now.startOf("week");
+      await rotateHouseholdChores({
+        householdSnapshot,
+        weekStart,
+        weekKey: `manual-${commandSnapshot.id}`,
+        epochWeek: Math.floor(weekStart.toMillis() / 604800000),
+        recordScheduledRun: false,
+      });
+    } finally {
+      await commandSnapshot.ref.delete();
+    }
+  }
+);
+
+type RotationInput = {
+  householdSnapshot: DocumentSnapshot;
+  weekStart: DateTime;
+  weekKey: string;
+  epochWeek: number;
+  recordScheduledRun: boolean;
+};
+
+/**
+ * Performs one household rotation for a schedule or an owner Dev command.
+ * @param {RotationInput} input Household, week and execution mode.
+ * @return {Promise<void>} Completion of task updates and notifications.
+ */
+async function rotateHouseholdChores(input: RotationInput): Promise<void> {
+  const household = input.householdSnapshot.data() as
+    HouseholdDocument | undefined;
+  if (!household) {
+    return;
+  }
+
+  if (input.recordScheduledRun &&
+      household.weekly_assignment_last_run_week === input.weekKey) {
+    return;
+  }
+
+  const memberIds = [...new Set(household.member_ids ?? [])].sort();
+  if (memberIds.length === 0) {
+    logger.warn("Weekly assignment skipped: household has no members", {
+      householdId: input.householdSnapshot.id,
+    });
+    return;
+  }
+
+  const tasks = await input.householdSnapshot.ref.collection("tasks")
+    .where("participates_in_weekly_rotation", "==", true)
+    .limit(450)
+    .get();
+  const sortedTasks = tasks.docs.sort((left, right) =>
+    left.id.localeCompare(right.id)
+  );
+  const database = getFirestore();
+  const batch = database.batch();
+  const assignments: Array<{
+    taskId: string;
+    title?: string;
+    recipientUserId: string;
+  }> = [];
+
+  sortedTasks.forEach((taskSnapshot, index) => {
+    const task = taskSnapshot.data() as TaskDocument;
+    const currentMemberIndex = memberIds.indexOf(
+      task.assigned_to_user_id ?? ""
+    );
+    const recipientIndex = input.recordScheduledRun ?
+      (input.epochWeek + index) % memberIds.length :
+      (Math.max(currentMemberIndex, -1) + 1) % memberIds.length;
+    const recipientUserId = memberIds[recipientIndex];
+    const update: Record<string, unknown> = {
+      assigned_to_user_id: recipientUserId,
+      status: "pending",
+      last_weekly_rotation_at: FieldValue.serverTimestamp(),
+    };
+
+    if (task.due_date) {
+      const oldDueDate = DateTime.fromMillis(
+        task.due_date.toMillis(),
+        {zone: "Europe/London"}
+      );
+      const newDueDate = input.weekStart
+        .plus({days: oldDueDate.weekday - 1})
+        .set({
+          hour: oldDueDate.hour,
+          minute: oldDueDate.minute,
+          second: oldDueDate.second,
+          millisecond: oldDueDate.millisecond,
+        });
+      const shiftMilliseconds = newDueDate.toMillis() -
+        oldDueDate.toMillis();
+
+      update.due_date = Timestamp.fromMillis(newDueDate.toMillis());
+      if (task.reminder_at) {
+        update.reminder_at = Timestamp.fromMillis(
+          task.reminder_at.toMillis() + shiftMilliseconds
+        );
+      }
+    }
+
+    batch.update(taskSnapshot.ref, update);
+    assignments.push({
+      taskId: task.task_id ?? taskSnapshot.id,
+      title: task.title,
+      recipientUserId,
+    });
+  });
+
+  if (input.recordScheduledRun) {
+    batch.update(input.householdSnapshot.ref, {
+      weekly_assignment_last_run_week: input.weekKey,
+      weekly_assignment_last_run_at: FieldValue.serverTimestamp(),
+    });
+  } else {
+    batch.update(input.householdSnapshot.ref, {
+      weekly_assignment_last_manual_run_at: FieldValue.serverTimestamp(),
+    });
+  }
+  await batch.commit();
+
+  const notificationResults = await Promise.allSettled(
+    assignments.map((assignment) => createNotificationAndSendPush({
+      notificationId: `weeklyAssignment-${input.weekKey}-${assignment.taskId}`,
+      recipientUserId: assignment.recipientUserId,
+      householdId: input.householdSnapshot.id,
+      relatedEntityId: assignment.taskId,
+      type: "weeklyTaskAssigned",
+      destination: "household",
+      preferenceField: "task_notifications_enabled",
+      title: "Your chore for this week",
+      message: assignment.title ?? "A household chore was assigned to you.",
+    }))
+  );
+  const failedCount = notificationResults.filter(
+    (result) => result.status === "rejected"
+  ).length;
+
+  logger.info("Weekly chores rotated", {
+    householdId: input.householdSnapshot.id,
+    taskCount: assignments.length,
+    failedNotificationCount: failedCount,
+    weekKey: input.weekKey,
+  });
+}
 
 /** Sends task and bill reminders whose selected delivery time has arrived. */
 export const sendDueReminders = onSchedule(

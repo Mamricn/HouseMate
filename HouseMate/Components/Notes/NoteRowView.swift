@@ -14,11 +14,12 @@ struct NoteRowView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             
-            Image(systemName: note.category.systemImage)
-                .font(.title3)
-                .frame(width: 40, height: 40)
-                .background(.thinMaterial)
-                .clipShape(Circle())
+            HouseMateSymbolView(
+                systemName: note.category.systemImage,
+                color: .indigo,
+                size: 40,
+                symbolSize: 17
+            )
             
             VStack(alignment: .leading, spacing: 4) {
                 

@@ -14,11 +14,12 @@ struct BillRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             
-            Image(systemName: bill.category.systemImage)
-                .font(.title3)
-                .frame(width: 40, height: 40)
-                .background(.thinMaterial)
-                .clipShape(Circle())
+            HouseMateSymbolView(
+                systemName: bill.category.systemImage,
+                color: .blue,
+                size: 40,
+                symbolSize: 17
+            )
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(bill.title)

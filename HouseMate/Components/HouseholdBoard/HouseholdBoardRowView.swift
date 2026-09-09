@@ -13,28 +13,30 @@ struct HouseholdBoardRowView: View {
     let user: UserModel
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
             
             CachedProfileImage(
                 urlString: user.profileImageUrl,
                 displayName: user.name ?? "Housemate",
-                size: 42
+                size: 32
             )
             
             VStack(alignment: .leading, spacing: 4) {
                 
                 Text(user.name ?? "Unknown")
-                    .font(.headline)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
                 
                 Text(post.text)
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
+                    .lineLimit(2)
             }
             
             Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 

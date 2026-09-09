@@ -10,7 +10,6 @@ import SwiftUI
 struct TaskCardView: View {
 
     let tasks: [TaskModel]
-    let members: [HouseholdMemberModel]
 
     var showsAddButton: Bool = true
     var usesThinMaterial: Bool = true
@@ -64,61 +63,34 @@ struct TaskCardView: View {
     }
 
     private var tasksList: some View {
-        List(tasks) { task in
-            let member = members.first {
-                $0.userId == task.assignedToUserId
-            }
-
-            TaskRowView(
-                task: task,
-                member: member
-            )
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
-            .swipeActions(
-                edge: .trailing,
-                allowsFullSwipe: true
-            ) {
-                Button {
-                    onToggleStatus(task)
-                } label: {
-                    Label(
-                        task.status == .completed
-                            ? "Mark Pending"
-                            : "Complete",
-                        systemImage: task.status == .completed
-                            ? "arrow.uturn.backward.circle"
-                            : "checkmark.circle"
-                    )
+        ScrollView {
+            LazyVStack(spacing: 4) {
+                ForEach(tasks) { task in
+                    TaskRowView(task: task)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            HapticFeedback.selection()
+                            onToggleStatus(task)
+                        }
                 }
-                .tint(
-                    task.status == .completed
-                        ? .orange
-                        : .green
-                )
             }
-            .roundedSwipeActions()
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .frame(height: 140)
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: min(CGFloat(tasks.count) * 58, 180))
     }
 }
 
 #Preview("With Tasks") {
     TaskCardView(
-        tasks: TaskModel.mockList,
-        members: HouseholdMemberModel.mockList
+        tasks: TaskModel.mockList
     )
     .padding()
 }
 
 #Preview("Empty") {
     TaskCardView(
-        tasks: [],
-        members: HouseholdMemberModel.mockList
+        tasks: []
     )
     .padding()
 }

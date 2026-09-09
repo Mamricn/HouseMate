@@ -132,3 +132,20 @@ struct CachedProfileImage: View {
             : String(characters).uppercased()
     }
 }
+
+#Preview("Profile Image Fallback") {
+    VStack(spacing: 24) {
+        CachedProfileImage(
+            urlString: nil,
+            displayName: "Marcin Turek",
+            size: 96
+        )
+
+        CachedProfileImage(
+            urlString: nil,
+            displayName: "Housemate",
+            size: 48
+        )
+    }
+    .padding()
+}

@@ -29,17 +29,10 @@ struct ScheduleTaskRowView: View {
     // MARK: - Category
 
     private var categoryIcon: some View {
-        Image(systemName: categorySystemImage)
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(categoryColor)
-            .frame(width: 42, height: 42)
-            .background {
-                RoundedRectangle(
-                    cornerRadius: 14,
-                    style: .continuous
-                )
-                .fill(categoryColor.opacity(0.12))
-            }
+        HouseMateSymbolView(
+            systemName: categorySystemImage,
+            color: categoryColor
+        )
     }
 
     // MARK: - Information
@@ -86,15 +79,16 @@ struct ScheduleTaskRowView: View {
     private var statusIcon: some View {
         Image(
             systemName: task.status == .completed
-                ? "checkmark.circle.fill"
+                ? "checkmark.circle"
                 : "circle"
         )
         .font(.system(size: 24))
         .foregroundStyle(
             task.status == .completed
-                ? .green
+                ? .blue
                 : .secondary
         )
+        .animation(.snappy(duration: 0.22), value: task.status)
     }
 
     // MARK: - Time

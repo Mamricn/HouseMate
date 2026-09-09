@@ -22,7 +22,8 @@ struct AddChoreView: View {
         _ dueDate: Date,
         _ isAllDay: Bool,
         _ category: TaskCategory,
-        _ notificationAdvance: HouseReminderAdvance
+        _ notificationAdvance: HouseReminderAdvance,
+        _ participatesInWeeklyRotation: Bool
     ) -> Void
 
     @State private var title = ""
@@ -32,6 +33,7 @@ struct AddChoreView: View {
     @State private var isAllDay = false
     @State private var category: TaskCategory = .cleaning
     @State private var notificationAdvance: HouseReminderAdvance = .none
+    @State private var participatesInWeeklyRotation = false
     @State private var hasAttemptedSubmit = false
 
     init(
@@ -44,7 +46,8 @@ struct AddChoreView: View {
             _ dueDate: Date,
             _ isAllDay: Bool,
             _ category: TaskCategory,
-            _ notificationAdvance: HouseReminderAdvance
+            _ notificationAdvance: HouseReminderAdvance,
+            _ participatesInWeeklyRotation: Bool
         ) -> Void
     ) {
         self.members = members
@@ -66,6 +69,7 @@ struct AddChoreView: View {
                 assignmentSection
                 scheduleSection
                 categorySection
+                rotationSection
                 notificationSection
             }
             .navigationTitle("Add Chore")
@@ -217,6 +221,17 @@ struct AddChoreView: View {
         }
     }
 
+    private var rotationSection: some View {
+        Section {
+            Toggle(
+                "Include in weekly rotation",
+                isOn: $participatesInWeeklyRotation
+            )
+        } footer: {
+            Text("When automatic weekly assignment is enabled, this chore will rotate fairly between housemates.")
+        }
+    }
+
     // MARK: - Toolbar
 
     private var cancellationToolbar: some ToolbarContent {
@@ -284,7 +299,8 @@ struct AddChoreView: View {
             finalDueDate,
             isAllDay,
             category,
-            notificationAdvance
+            notificationAdvance,
+            participatesInWeeklyRotation
         )
 
         dismiss()
@@ -360,7 +376,8 @@ struct AddChoreView: View {
         dueDate,
         isAllDay,
         category,
-        notificationAdvance in
+        notificationAdvance,
+        participatesInWeeklyRotation in
 
         print(title)
         print(description ?? "")
@@ -369,5 +386,6 @@ struct AddChoreView: View {
         print(isAllDay)
         print(category)
         print(notificationAdvance.title)
+        print(participatesInWeeklyRotation)
     }
 }

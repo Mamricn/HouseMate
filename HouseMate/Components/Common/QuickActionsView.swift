@@ -67,22 +67,12 @@ struct QuickActionsView: View {
             open(option)
         } label: {
             HStack(spacing: 14) {
-                Image(systemName: option.systemImage)
-                    .font(
-                        .system(
-                            size: 19,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(option.color)
-                    .frame(width: 44, height: 44)
-                    .background {
-                        RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
-                        .fill(option.color.opacity(0.12))
-                    }
+                HouseMateSymbolView(
+                    systemName: option.systemImage,
+                    color: option.color,
+                    size: 44,
+                    symbolSize: 19
+                )
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(option.title)

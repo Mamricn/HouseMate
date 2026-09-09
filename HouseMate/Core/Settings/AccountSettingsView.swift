@@ -487,3 +487,18 @@ private struct DeleteAccountConfirmationView: View {
         return true
     }
 }
+
+#Preview("Account Settings") {
+    let container = DependencyContainer.make(environment: .mock)
+    let interactor = CoreInteractor(container: container)
+
+    NavigationStack {
+        AccountSettingsView(
+            viewModel: AccountSettingsViewModel(
+                user: .mock,
+                household: .mock,
+                interactor: interactor
+            )
+        )
+    }
+}

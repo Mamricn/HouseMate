@@ -103,54 +103,67 @@ struct NotificationsView: View {
     // MARK: - List
 
     private var notificationsList: some View {
-        List {
-            if !todayNotifications.isEmpty {
-                Section("Today") {
-                    notificationRows(
-                        todayNotifications
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                if !todayNotifications.isEmpty {
+                    notificationSection(
+                        title: "Today",
+                        notifications: todayNotifications
                     )
                 }
-            }
 
-            if !earlierNotifications.isEmpty {
-                Section("Earlier") {
-                    notificationRows(
-                        earlierNotifications
+                if !earlierNotifications.isEmpty {
+                    notificationSection(
+                        title: "Earlier",
+                        notifications: earlierNotifications
                     )
                 }
             }
+            .padding(.horizontal)
+            .padding(.vertical, 12)
         }
-        .listStyle(.insetGrouped)
     }
 
     @ViewBuilder
-    private func notificationRows(
-        _ notifications: [NotificationModel]
+    private func notificationSection(
+        title: String,
+        notifications: [NotificationModel]
     ) -> some View {
-        ForEach(notifications) { notification in
-            NotificationRowView(
-                notification: notification,
-                referenceDate: referenceDate
-            )
-            .onTapGesture {
-                openNotification(notification)
-            }
-            .swipeActions(
-                edge: .leading,
-                allowsFullSwipe: false
-            ) {
-                Button(role: .destructive) {
-                    Task {
-                        _ = await viewModel.deleteNotification(notification)
-                    }
-                } label: {
-                    Label(
-                        "Delete",
-                        systemImage: "trash.fill"
+        Text(title)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .padding(.horizontal, 12)
+
+        VStack(spacing: 1) {
+            ForEach(notifications) { notification in
+                HouseMateSwipeRow(
+                    leadingAction: deleteAction(for: notification),
+                    trailingAction: nil
+                ) {
+                    NotificationRowView(
+                        notification: notification,
+                        referenceDate: referenceDate
                     )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        openNotification(notification)
+                    }
                 }
             }
-            .roundedSwipeActions()
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func deleteAction(for notification: NotificationModel) -> HouseMateSwipeAction {
+        HouseMateSwipeAction(
+            accessibilityLabel: "Delete notification",
+            systemImage: "trash.fill",
+            color: .red
+        ) {
+            Task {
+                _ = await viewModel.deleteNotification(notification)
+            }
         }
     }
 

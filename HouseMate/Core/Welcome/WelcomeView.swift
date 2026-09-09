@@ -46,18 +46,7 @@ struct WelcomeView: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: [
-                .blue,
-                .teal,
-                .blue.opacity(0.08),
-                .blue.opacity(0.002),
-                .black.opacity(0.1)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
+        OnboardingBackground()
     }
 
     private var pictures: some View {

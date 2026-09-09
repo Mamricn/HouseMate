@@ -204,6 +204,33 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             }
     }
 
+    func updateAutomaticWeeklyAssignment(
+        householdID: String,
+        isEnabled: Bool
+    ) async throws {
+        try await householdsCollection
+            .document(householdID)
+            .updateData([
+                "automatic_weekly_assignment_enabled": isEnabled
+            ])
+    }
+
+    func runWeeklyAssignmentNow(
+        householdID: String,
+        requestedByUserID: String
+    ) async throws {
+        let commandReference = householdsCollection
+            .document(householdID)
+            .collection("developer_commands")
+            .document()
+
+        try await commandReference.setData([
+            "command": "run_weekly_assignment",
+            "requested_by_user_id": requestedByUserID,
+            "created_at": FieldValue.serverTimestamp()
+        ])
+    }
+
     func removeMember(
         householdID: String,
         memberUserID: String,

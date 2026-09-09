@@ -20,6 +20,16 @@ protocol HouseholdServiceProtocol: AnyObject {
 
     func fetchMembers(householdID: String) async throws -> [HouseholdMemberModel]
 
+    func updateAutomaticWeeklyAssignment(
+        householdID: String,
+        isEnabled: Bool
+    ) async throws
+
+    func runWeeklyAssignmentNow(
+        householdID: String,
+        requestedByUserID: String
+    ) async throws
+
     func removeMember(
         householdID: String,
         memberUserID: String,

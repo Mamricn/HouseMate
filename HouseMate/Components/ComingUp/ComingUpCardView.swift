@@ -68,14 +68,12 @@ struct ComingUpCardView: View {
 
     private func itemRow(_ item: ComingUpItem) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: item.systemImage)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(color(for: item.kind))
-                .frame(width: 40, height: 40)
-                .background {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(color(for: item.kind).opacity(0.12))
-                }
+            HouseMateSymbolView(
+                systemName: item.systemImage,
+                color: color(for: item.kind),
+                size: 40,
+                symbolSize: 17
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
@@ -136,7 +134,7 @@ struct ComingUpCardView: View {
             return .blue
 
         case .reminder:
-            return .orange
+            return .purple
         }
     }
 

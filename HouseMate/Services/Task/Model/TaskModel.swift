@@ -29,6 +29,7 @@ struct TaskModel: Identifiable, Codable, Equatable {
     var status: TaskStatus
     var category: TaskCategory
     var notificationAdvance: HouseReminderAdvance?
+    var participatesInWeeklyRotation: Bool?
 
     init(
         taskId: String,
@@ -42,7 +43,8 @@ struct TaskModel: Identifiable, Codable, Equatable {
         isAllDay: Bool = false,
         status: TaskStatus = .pending,
         category: TaskCategory = .other,
-        notificationAdvance: HouseReminderAdvance? = nil
+        notificationAdvance: HouseReminderAdvance? = nil,
+        participatesInWeeklyRotation: Bool = false
     ) {
         self.taskId = taskId
         self.householdId = householdId
@@ -56,6 +58,7 @@ struct TaskModel: Identifiable, Codable, Equatable {
         self.status = status
         self.category = category
         self.notificationAdvance = notificationAdvance
+        self.participatesInWeeklyRotation = participatesInWeeklyRotation
     }
 
     enum CodingKeys: String, CodingKey {
@@ -71,6 +74,7 @@ struct TaskModel: Identifiable, Codable, Equatable {
         case status
         case category
         case notificationAdvance = "notification_advance"
+        case participatesInWeeklyRotation = "participates_in_weekly_rotation"
     }
 
     var eventParameters: [String: Any] {
@@ -86,7 +90,8 @@ struct TaskModel: Identifiable, Codable, Equatable {
             "task_\(CodingKeys.isAllDay.rawValue)": isAllDay,
             "task_\(CodingKeys.status.rawValue)": status.rawValue,
             "task_\(CodingKeys.category.rawValue)": category.rawValue,
-            "task_\(CodingKeys.notificationAdvance.rawValue)": notificationAdvance?.rawValue
+            "task_\(CodingKeys.notificationAdvance.rawValue)": notificationAdvance?.rawValue,
+            "task_\(CodingKeys.participatesInWeeklyRotation.rawValue)": participatesInWeeklyRotation
         ]
 
         return dictionary.compactMapValues { $0 }

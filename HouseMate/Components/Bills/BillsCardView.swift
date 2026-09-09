@@ -59,75 +59,46 @@ struct BillsCardView: View {
     // MARK: - Bills List
 
     private var billsList: some View {
-        List {
-            ForEach(bills) { bill in
-                BillRowView(bill: bill)
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 4,
-                            leading: 0,
-                            bottom: 4,
-                            trailing: 0
-                        )
-                    )
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-
-                    // Delete po lewej stronie
-                    .swipeActions(
-                        edge: .leading,
-                        allowsFullSwipe: false
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                ForEach(bills) { bill in
+                    HouseMateSwipeRow(
+                        leadingAction: deleteAction(for: bill),
+                        trailingAction: paidAction(for: bill)
                     ) {
-                        if onDelete != nil {
-                            deleteButton(for: bill)
-                        }
+                        BillRowView(bill: bill)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 4)
                     }
-
-                    // Mark as Paid po prawej stronie
-                    .swipeActions(
-                        edge: .trailing,
-                        allowsFullSwipe: true
-                    ) {
-                        if bill.status != .paid {
-                            markAsPaidButton(for: bill)
-                        }
-                    }
-                    .roundedSwipeActions()
+                }
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: 180)
     }
 
-    // MARK: - Swipe Action
+    private func deleteAction(for bill: BillModel) -> HouseMateSwipeAction? {
+        guard onDelete != nil else { return nil }
 
-    private func markAsPaidButton(
-        for bill: BillModel
-    ) -> some View {
-        Button {
-            onMarkAsPaid(bill)
-        } label: {
-            Label(
-                "Mark as Paid",
-                systemImage: "checkmark.circle.fill"
-            )
-        }
-        .tint(.green)
-    }
-    
-    private func deleteButton(
-        for bill: BillModel
-    ) -> some View {
-        Button(role: .destructive) {
+        return HouseMateSwipeAction(
+            accessibilityLabel: "Delete \(bill.title)",
+            systemImage: "trash.fill",
+            color: .red
+        ) {
             onDelete?(bill)
-        } label: {
-            Label(
-                "Delete",
-                systemImage: "trash.fill"
-            )
+        }
+    }
+
+    private func paidAction(for bill: BillModel) -> HouseMateSwipeAction? {
+        guard bill.status != .paid else { return nil }
+
+        return HouseMateSwipeAction(
+            accessibilityLabel: "Mark \(bill.title) as paid",
+            systemImage: "checkmark",
+            color: .green
+        ) {
+            onMarkAsPaid(bill)
         }
     }
 
