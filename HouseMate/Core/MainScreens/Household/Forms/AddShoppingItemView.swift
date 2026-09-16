@@ -14,6 +14,10 @@ struct AddShoppingItemView: View {
     @State private var itemName = ""
     @State private var quantity = 1
     @State private var hasAttemptedSubmit = false
+    @State private var selectedListID = "groceries"
+    var lists: [ShoppingCollection] = []
+    var initialListID: String = "groceries"
+    var onListSelected: (String) -> Void = { _ in }
 
     let onSave: (
         _ name: String,
@@ -23,6 +27,13 @@ struct AddShoppingItemView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if !lists.isEmpty {
+                    Section("Shopping List") {
+                        Picker("List", selection: $selectedListID) {
+                            ForEach(lists) { list in Text(list.name).tag(list.id) }
+                        }
+                    }
+                }
                 Section("Item") {
                     TextField(
                         "Item name",
@@ -52,6 +63,7 @@ struct AddShoppingItemView: View {
                 }
             }
             .navigationTitle("Add Item")
+            .onAppear { selectedListID = initialListID }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(
@@ -87,6 +99,7 @@ struct AddShoppingItemView: View {
             return
         }
 
+        onListSelected(selectedListID)
         onSave(
             trimmedItemName,
             quantity

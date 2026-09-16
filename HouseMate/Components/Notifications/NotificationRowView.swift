@@ -21,6 +21,8 @@ struct NotificationRowView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(notification.title)
                         .font(.subheadline)
+                        .lineLimit(1)
+                        .layoutPriority(1)
                         .fontWeight(
                             notification.isRead
                                 ? .medium
@@ -31,13 +33,14 @@ struct NotificationRowView: View {
 
                     Text(relativeDateText)
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.48))
+                        .fixedSize(horizontal: true, vertical: false)
                 }
 
                 Text(notification.message)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
+                    .foregroundStyle(Color.primary.opacity(0.56))
+                    .lineLimit(2)
             }
 
             if !notification.isRead {
@@ -47,19 +50,41 @@ struct NotificationRowView: View {
                     .padding(.top, 6)
             }
         }
-        .padding(.vertical, 7)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 9)
         .contentShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            Divider()
+                .padding(.leading, 52)
+                .opacity(0.55)
+        }
     }
 
     // MARK: - Icon
 
     private var notificationIcon: some View {
-        HouseMateSymbolView(
-            systemName: notification.type.systemImage,
-            color: notificationColor,
-            size: 40,
-            symbolSize: 17
-        )
+        ZStack {
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [notificationColor.opacity(0.92), notificationColor.opacity(0.62)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Circle()
+                .fill(.white.opacity(0.22))
+                .frame(width: 24, height: 24)
+                .offset(x: 13, y: -13)
+
+            Image(systemName: notification.type.systemImage)
+                .font(.system(size: 17, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.white)
+        }
+        .frame(width: 40, height: 40)
+        .shadow(color: notificationColor.opacity(0.20), radius: 5, y: 3)
     }
 
     private var notificationColor: Color {

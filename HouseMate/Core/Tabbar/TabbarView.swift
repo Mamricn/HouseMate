@@ -30,6 +30,8 @@ struct TabbarView: View {
 
     @State private var activeSheet: TabbarSheet?
     @State private var toast: AppToast?
+    @State private var calendarSelectedDate = Calendar.current.startOfDay(for: .now)
+    @State private var calendarPrefillDate: Date?
 
     init(
         user: UserModel,
@@ -65,6 +67,7 @@ struct TabbarView: View {
             initialValue: HouseholdViewModel(
                 currentUser: user,
                 members: members,
+                householdOwnerUserID: household.ownerUserId,
                 interactor: interactor
             )
         )
@@ -108,6 +111,19 @@ struct TabbarView: View {
                         onSignOut: onSignOut,
                         onOpenSettings: {
                             router.navigate(to: .settings)
+                        },
+                        onOpenShopping: { listID in
+                            householdViewModel.selectedShoppingListID = listID
+                            router.navigate(to: .householdShopping)
+                        },
+                        onOpenReminders: {
+                            router.navigate(to: .householdReminders(UUID()))
+                        },
+                        onOpenBills: {
+                            router.navigate(to: .householdBills)
+                        },
+                        onOpenTasks: {
+                            router.navigate(to: .householdCleaning)
                         }
                     )
                     .customTabBarSafeArea()
@@ -115,14 +131,47 @@ struct TabbarView: View {
 
                 Tab(value: .houseHold) {
                     HouseholdView(
-                        viewModel: householdViewModel
+                        viewModel: householdViewModel,
+                        onOpenBills: {
+                            router.navigate(to: .householdBills)
+                        },
+                        onOpenCleaning: {
+                            router.navigate(to: .householdCleaning)
+                        },
+                        onOpenShopping: {
+                            router.navigate(to: .householdShopping)
+                        },
+                        onOpenPolls: {
+                            router.navigate(to: .householdPolls)
+                        },
+                        onOpenReminders: {
+                            router.navigate(to: .householdReminders(UUID()))
+                        },
+                        onOpenDocuments: {
+                            router.navigate(to: .householdDocuments)
+                        }
                     )
                     .customTabBarSafeArea()
                 }
 
-                Tab(value: .housemates) {
-                    HousematesView(
-                        viewModel: housematesViewModel
+                Tab(value: .calendar) {
+                    HouseholdCalendarView(
+                        tasks: householdViewModel.tasks,
+                        bills: householdViewModel.bills,
+                        reminders: householdViewModel.reminders,
+                        selectedDate: $calendarSelectedDate,
+                        onOpenTasks: {
+                            router.navigate(to: .householdCleaning)
+                        },
+                        onOpenBills: {
+                            router.navigate(to: .householdBills)
+                        },
+                        onOpenReminders: {
+                            router.navigate(to: .householdReminders(UUID()))
+                        },
+                        onRefresh: {
+                            await householdViewModel.refreshData()
+                        }
                     )
                     .customTabBarSafeArea()
                 }
@@ -260,6 +309,259 @@ struct TabbarView: View {
                     applyProfileImageURL(imageURL)
                 }
             )
+
+        case .householdBills:
+            BillsView(
+                bills: householdViewModel.bills,
+                onAdd: { activeSheet = .bill },
+                onMarkAsPaid: { bill in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(bill.title) marked as paid",
+                        systemImage: "checkmark.circle.fill",
+                        operation: {
+                            await householdViewModel.markBillAsPaid(bill)
+                        }
+                    )
+                },
+                onDelete: { bill in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(bill.title) deleted",
+                        systemImage: "trash.fill",
+                        operation: {
+                            await householdViewModel.deleteBill(bill)
+                        }
+                    )
+                }
+            )
+            .navigationTitle("Bills")
+            .navigationBarTitleDisplayMode(.inline)
+
+        case .householdCleaning:
+            CleaningScheduleView(
+                selectedDate: $householdViewModel.selectedDate,
+                tasks: householdViewModel.tasks,
+                members: householdViewModel.members,
+                onAdd: { activeSheet = .chore },
+                onToggleStatus: { task in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: task.status == .completed
+                            ? "Chore marked as pending"
+                            : "Chore completed",
+                        systemImage: task.status == .completed
+                            ? "arrow.uturn.backward.circle"
+                            : "checkmark.circle.fill",
+                        operation: {
+                            await householdViewModel.toggleTaskStatus(task)
+                        }
+                    )
+                },
+                onDelete: { task in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(task.title) deleted",
+                        systemImage: "trash.fill",
+                        operation: {
+                            await householdViewModel.deleteTask(task)
+                        }
+                    )
+                }
+            )
+            .navigationTitle("Cleaning Schedule")
+            .navigationBarTitleDisplayMode(.inline)
+
+        case .householdShopping:
+            ShoppingCollectionsView(
+                items: householdViewModel.shoppingItems,
+                lists: householdViewModel.shoppingLists,
+                initialListID: householdViewModel.selectedShoppingListID,
+                onSelect: { householdViewModel.selectedShoppingListID = $0 },
+                onSaveList: { await householdViewModel.saveShoppingList($0) },
+                onAdd: { activeSheet = .shoppingItem },
+                onQuickAdd: { name, listID in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(name) added",
+                        systemImage: "cart.badge.plus",
+                        operation: {
+                            await householdViewModel.addShoppingItem(
+                                name: name,
+                                quantity: 1,
+                                listID: listID
+                            )
+                        }
+                    )
+                },
+                onTogglePurchased: { item in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: item.isPurchased
+                            ? "\(item.name) added back"
+                            : "\(item.name) purchased",
+                        systemImage: item.isPurchased
+                            ? "arrow.uturn.backward.circle"
+                            : "cart.badge.checkmark",
+                        operation: {
+                            await householdViewModel.toggleShoppingItem(item)
+                        }
+                    )
+                },
+                onDelete: { item in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(item.name) deleted",
+                        systemImage: "trash.fill",
+                        operation: {
+                            await householdViewModel.deleteShoppingItem(item)
+                        }
+                    )
+                },
+                onClearPurchased: { listID in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "Purchased items cleared",
+                        systemImage: "checkmark.circle.fill",
+                        operation: {
+                            await householdViewModel.clearPurchasedShoppingItems(listID: listID)
+                        }
+                    )
+                },
+                onMove: { item, listID in
+                    performAction(state: householdViewModel.actionState, successMessage: "Item moved", systemImage: "cart", operation: {
+                        await householdViewModel.moveShoppingItem(item, to: listID)
+                    })
+                }
+            )
+            .navigationTitle("Shopping")
+            .navigationBarTitleDisplayMode(.inline)
+
+        case .householdPolls:
+            PollsView(
+                polls: householdViewModel.polls,
+                currentUserId: householdViewModel.currentUser.id,
+                members: householdViewModel.members,
+                onAdd: { activeSheet = .poll },
+                onVote: { poll, option in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "Vote submitted",
+                        systemImage: "checkmark.circle.fill",
+                        operation: {
+                            await householdViewModel.vote(in: poll, for: option)
+                        }
+                    )
+                },
+                onRemoveVote: { poll in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "Vote removed",
+                        systemImage: "arrow.uturn.backward.circle",
+                        operation: {
+                            await householdViewModel.removeVote(in: poll)
+                        }
+                    )
+                },
+                onClose: { poll in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "Poll closed",
+                        systemImage: "checkmark.circle",
+                        operation: {
+                            await householdViewModel.closePoll(poll)
+                        }
+                    )
+                },
+                onDelete: { poll in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "Poll deleted",
+                        systemImage: "trash.fill",
+                        operation: {
+                            await householdViewModel.deletePoll(poll)
+                        }
+                    )
+                }
+            )
+            .navigationTitle("Polls")
+            .navigationBarTitleDisplayMode(.inline)
+
+        case .householdReminders:
+            RemindersView(
+                reminders: householdViewModel.reminders,
+                currentUserId: householdViewModel.currentUser.id,
+                householdOwnerUserId: householdViewModel.householdOwnerUserID,
+                onAdd: { activeSheet = .reminder },
+                onDelete: { reminder in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(reminder.title) deleted",
+                        systemImage: "trash.fill",
+                        operation: {
+                            await householdViewModel.deleteReminder(reminder)
+                        }
+                    )
+                },
+                onUpdate: {
+                    reminder,
+                    title,
+                    details,
+                    firstOccurrenceDate,
+                    recurrence,
+                    category,
+                    reminderAdvance in
+
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(title) updated",
+                        systemImage: "checkmark.circle.fill",
+                        operation: {
+                            await householdViewModel.updateReminder(
+                                reminder,
+                                title: title,
+                                details: details,
+                                firstOccurrenceDate: firstOccurrenceDate,
+                                recurrence: recurrence,
+                                category: category,
+                                reminderAdvance: reminderAdvance
+                            )
+                        }
+                    )
+                }
+            )
+            .navigationTitle("Reminders")
+            .navigationBarTitleDisplayMode(.inline)
+
+        case .householdDocuments:
+            DocumentsView(
+                documents: householdViewModel.documents,
+                currentUserId: householdViewModel.currentUser.id,
+                householdOwnerUserId: householdViewModel.householdOwnerUserID,
+                onAdd: { activeSheet = .document },
+                onDelete: { document in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(document.title) deleted",
+                        systemImage: "trash.fill",
+                        operation: {
+                            await householdViewModel.deleteDocument(document)
+                        }
+                    )
+                },
+                onUpdate: { document in
+                    performAction(
+                        state: householdViewModel.actionState,
+                        successMessage: "\(document.title) updated",
+                        systemImage: "checkmark.circle.fill",
+                        operation: {
+                            await householdViewModel.updateDocument(document)
+                        }
+                    )
+                }
+            )
+            .navigationTitle("Documents")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 
@@ -442,8 +744,8 @@ struct TabbarView: View {
         case .houseHold:
             activeSheet = .householdActions
 
-        case .housemates:
-            activeSheet = .housematesActions
+        case .calendar:
+            activeSheet = .calendarActions
         }
     }
 
@@ -455,8 +757,8 @@ struct TabbarView: View {
         case .houseHold:
             return "Add household item"
 
-        case .housemates:
-            return "Create or invite"
+        case .calendar:
+            return "Add calendar item"
         }
     }
 
@@ -472,6 +774,9 @@ struct TabbarView: View {
 
         case .householdActions:
             householdQuickActionsSheet
+
+        case .calendarActions:
+            calendarQuickActionsSheet
 
         case .housematesActions:
             housematesQuickActionsSheet
@@ -496,6 +801,9 @@ struct TabbarView: View {
 
         case .reminder:
             reminderSheet
+
+        case .document:
+            documentSheet
         }
     }
 
@@ -510,6 +818,7 @@ struct TabbarView: View {
         )
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .presentationBackground(.clear)
     }
 
     // MARK: - Household Quick Actions
@@ -521,35 +830,115 @@ struct TabbarView: View {
             options: [
                 QuickActionOption(
                     title: "Add Chore",
-                    subtitle: "Schedule a household task",
+                    subtitle: "Assign a household task",
                     systemImage: "checklist",
                     color: .blue,
                     action: {
+                        calendarPrefillDate = nil
                         activeSheet = .chore
                     }
                 ),
                 QuickActionOption(
                     title: "Shopping Item",
-                    subtitle: "Add something to the shopping list",
+                    subtitle: "Add to the shopping list",
                     systemImage: "cart.badge.plus",
                     color: .green,
                     action: {
+                        calendarPrefillDate = nil
                         activeSheet = .shoppingItem
                     }
                 ),
                 QuickActionOption(
                     title: "Add Bill",
-                    subtitle: "Create a new household bill",
+                    subtitle: "Track a household bill",
                     systemImage: "creditcard.fill",
                     color: .orange,
                     action: {
+                        calendarPrefillDate = nil
                         activeSheet = .bill
                     }
+                ),
+                QuickActionOption(
+                    title: "Add Reminder",
+                    subtitle: "Plan a reminder",
+                    systemImage: "bell.badge.fill",
+                    color: .purple,
+                    action: {
+                        calendarPrefillDate = nil
+                        activeSheet = .reminder
+                    }
+                ),
+                QuickActionOption(
+                    title: "Create Poll",
+                    subtitle: "Ask your household",
+                    systemImage: "chart.bar.doc.horizontal",
+                    color: .indigo,
+                    action: {
+                        calendarPrefillDate = nil
+                        activeSheet = .poll
+                    }
+                ),
+                QuickActionOption(
+                    title: "Add Document",
+                    subtitle: "Save a receipt or file",
+                    systemImage: "doc.badge.plus",
+                    color: .cyan,
+                    action: {
+                        calendarPrefillDate = nil
+                        activeSheet = .document
+                    }
                 )
-            ]
+            ],
+            layout: .grid
+        )
+        .presentationDetents([.height(505)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(.clear)
+    }
+
+    // MARK: - Calendar Quick Actions
+
+    private var calendarQuickActionsSheet: some View {
+        QuickActionsView(
+            title: "Schedule",
+            subtitle: "Add something for \(calendarSelectedDate.formatted(.dateTime.day().month(.wide))).",
+            options: [
+                QuickActionOption(
+                    title: "Schedule Chore",
+                    subtitle: "Assign a task for this day",
+                    systemImage: "checklist",
+                    color: .blue,
+                    action: {
+                        calendarPrefillDate = calendarSelectedDate
+                        activeSheet = .chore
+                    }
+                ),
+                QuickActionOption(
+                    title: "Add Bill",
+                    subtitle: "Set a bill due on this day",
+                    systemImage: "creditcard.fill",
+                    color: .orange,
+                    action: {
+                        calendarPrefillDate = calendarSelectedDate
+                        activeSheet = .bill
+                    }
+                ),
+                QuickActionOption(
+                    title: "Add Reminder",
+                    subtitle: "Create a reminder for this day",
+                    systemImage: "bell.badge.fill",
+                    color: .purple,
+                    action: {
+                        calendarPrefillDate = calendarSelectedDate
+                        activeSheet = .reminder
+                    }
+                )
+            ],
+            layout: .themedList
         )
         .presentationDetents([.height(390)])
         .presentationDragIndicator(.visible)
+        .presentationBackground(.clear)
     }
 
     // MARK: - Housemates Quick Actions
@@ -606,7 +995,7 @@ struct TabbarView: View {
     private var choreSheet: some View {
         AddChoreView(
             members: householdViewModel.members,
-            selectedDate: householdViewModel.selectedDate
+            selectedDate: calendarPrefillDate ?? householdViewModel.selectedDate
         ) {
             title,
             description,
@@ -640,7 +1029,7 @@ struct TabbarView: View {
     }
 
     private var shoppingItemSheet: some View {
-        AddShoppingItemView { name, quantity in
+        AddShoppingItemView(lists: householdViewModel.shoppingLists, initialListID: householdViewModel.selectedShoppingListID, onListSelected: { householdViewModel.selectedShoppingListID = $0 }) { name, quantity in
             performAction(
                 state: householdViewModel.actionState,
                 successMessage: "\(name) added",
@@ -658,7 +1047,7 @@ struct TabbarView: View {
     }
 
     private var billSheet: some View {
-        AddBillView {
+        AddBillView(initialDueDate: calendarPrefillDate ?? .now) {
             title,
             amount,
             dueDate,
@@ -720,11 +1109,11 @@ struct TabbarView: View {
             expiresAt in
 
             performAction(
-                state: housematesViewModel.actionState,
+                state: householdViewModel.actionState,
                 successMessage: "Poll created",
                 systemImage: "chart.bar.doc.horizontal",
                 operation: {
-                    await housematesViewModel.addPoll(
+                    await householdViewModel.addPoll(
                     question: question,
                     options: options,
                     expiresAt: expiresAt
@@ -737,7 +1126,7 @@ struct TabbarView: View {
     }
 
     private var reminderSheet: some View {
-        AddHouseReminderView {
+        AddHouseReminderView(initialDate: calendarPrefillDate ?? .now) {
             title,
             details,
             firstOccurrenceDate,
@@ -746,11 +1135,11 @@ struct TabbarView: View {
             reminderAdvance in
 
             performAction(
-                state: housematesViewModel.actionState,
+                state: householdViewModel.actionState,
                 successMessage: "\(title) added",
                 systemImage: "bell.badge.fill",
                 operation: {
-                    await housematesViewModel.addReminder(
+                    await householdViewModel.addReminder(
                     title: title,
                     details: details,
                     firstOccurrenceDate: firstOccurrenceDate,
@@ -758,6 +1147,41 @@ struct TabbarView: View {
                     category: category,
                     reminderAdvance: reminderAdvance
                 )
+                }
+            )
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var documentSheet: some View {
+        AddDocumentView {
+            title,
+            category,
+            notes,
+            storeName,
+            amount,
+            purchaseDate,
+            warrantyExpiresAt,
+            serialNumber,
+            attachment in
+
+            performAction(
+                state: householdViewModel.actionState,
+                successMessage: "\(title) added",
+                systemImage: "doc.badge.plus",
+                operation: {
+                    await householdViewModel.addDocument(
+                        title: title,
+                        category: category,
+                        notes: notes,
+                        storeName: storeName,
+                        amount: amount,
+                        purchaseDate: purchaseDate,
+                        warrantyExpiresAt: warrantyExpiresAt,
+                        serialNumber: serialNumber,
+                        attachment: attachment
+                    )
                 }
             )
         }
@@ -823,7 +1247,7 @@ struct TabbarView: View {
                 activeTab = .houseHold
 
             case .housemates:
-                activeTab = .housemates
+                activeTab = .houseHold
             }
         }
     }
@@ -840,7 +1264,7 @@ struct TabbarView: View {
         case .household:
             activeTab = .houseHold
         case .housemates:
-            activeTab = .housemates
+            activeTab = .houseHold
         }
     }
 }
@@ -851,6 +1275,7 @@ private enum TabbarSheet: String, Identifiable {
     case notifications
 
     case householdActions
+    case calendarActions
     case housematesActions
 
     case chore
@@ -861,6 +1286,7 @@ private enum TabbarSheet: String, Identifiable {
     case post
     case poll
     case reminder
+    case document
 
     var id: String {
         rawValue
@@ -872,7 +1298,7 @@ private enum TabbarSheet: String, Identifiable {
 enum CustomTab: String, CaseIterable {
     case home = "Home"
     case houseHold = "Household"
-    case housemates = "Housemates"
+    case calendar = "Calendar"
 
     var symbol: String {
         switch self {
@@ -882,8 +1308,8 @@ enum CustomTab: String, CaseIterable {
         case .houseHold:
             return "creditcard.fill"
 
-        case .housemates:
-            return "person.3.fill"
+        case .calendar:
+            return "calendar"
         }
     }
 
@@ -895,8 +1321,8 @@ enum CustomTab: String, CaseIterable {
         case .houseHold:
             return "plus"
 
-        case .housemates:
-            return "square.and.pencil"
+        case .calendar:
+            return "calendar.badge.plus"
         }
     }
 

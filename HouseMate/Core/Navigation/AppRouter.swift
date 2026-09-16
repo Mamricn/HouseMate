@@ -4,12 +4,13 @@
 //
 
 import Observation
+import SwiftUI
 
 @MainActor
 @Observable
 final class AppRouter {
 
-    var path: [MainRoute] = []
+    var path = NavigationPath()
 
     func navigate(to route: MainRoute) {
         path.append(route)
@@ -21,6 +22,6 @@ final class AppRouter {
     }
 
     func reset() {
-        path.removeAll()
+        path = NavigationPath()
     }
 }

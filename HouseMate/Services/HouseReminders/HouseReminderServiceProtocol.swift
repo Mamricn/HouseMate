@@ -18,6 +18,8 @@ protocol HouseReminderServiceProtocol: AnyObject {
 
     func createReminder(_ reminder: HouseReminderModel) async throws
 
+    func updateReminder(_ reminder: HouseReminderModel) async throws
+
     func deleteReminder(reminderID: String, householdID: String) async throws
 }
 

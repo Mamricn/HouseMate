@@ -14,4 +14,10 @@ enum MainRoute: Hashable {
     case householdSettings
     case accountSettings
     case profileSettings
+    case householdBills
+    case householdCleaning
+    case householdShopping
+    case householdPolls
+    case householdReminders(UUID)
+    case householdDocuments
 }

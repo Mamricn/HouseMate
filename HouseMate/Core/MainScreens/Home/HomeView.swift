@@ -29,6 +29,10 @@ final class HomeViewModel {
         interactor.shoppingItems
     }
 
+    var shoppingLists: [ShoppingCollection] {
+        interactor.shoppingLists
+    }
+
     var bills: [BillModel] {
         interactor.bills
     }
@@ -303,6 +307,10 @@ struct HomeView: View {
     let viewModel: HomeViewModel
     let onSignOut: () -> Void
     var onOpenSettings: () -> Void = {}
+    var onOpenShopping: (String) -> Void = { _ in }
+    var onOpenReminders: () -> Void = {}
+    var onOpenBills: () -> Void = {}
+    var onOpenTasks: () -> Void = {}
 
     @State private var toast: AppToast?
     @State private var isHeaderElevated = false
@@ -343,9 +351,8 @@ struct HomeView: View {
                     spacing: 20
                 ) {
                     tasksCard
-                    comingUpCard
+                    compactOverviewCards
                     shoppingCard
-                    billsCard
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
@@ -408,7 +415,7 @@ struct HomeView: View {
 
     private func refreshHouseIcon(progress: CGFloat) -> some View {
         ZStack {
-            Image(systemName: "house")
+            Image(systemName: "house.fill")
                 .foregroundStyle(.secondary.opacity(0.55))
 
             Image(systemName: "house.fill")
@@ -458,7 +465,7 @@ struct HomeView: View {
             profileButton
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Hi, \(viewModel.firstName)")
+                Text("Hey, \(viewModel.firstName)")
                     .font(
                         .system(
                             size: 19,
@@ -517,6 +524,7 @@ struct HomeView: View {
             tasks: viewModel.todaysTasks,
             showsAddButton: false,
             usesThinMaterial: true,
+            onOpenAll: onOpenTasks,
             onToggleStatus: { task in
                 performAction(
                     successMessage: task.status == .completed
@@ -537,13 +545,19 @@ struct HomeView: View {
         .dashboardShadow()
     }
 
-    // MARK: - Coming Up Card
+    // MARK: - Compact Overview Cards
 
-    private var comingUpCard: some View {
-        ComingUpCardView(
-            items: viewModel.comingUpItems,
-            usesThinMaterial: true
-        )
+    private var compactOverviewCards: some View {
+        HStack(alignment: .top, spacing: 12) {
+            HomeCompactComingUpCard(
+                items: viewModel.comingUpItems,
+                onTap: onOpenReminders
+            )
+            HomeCompactBillsCard(
+                bills: viewModel.upcomingBills,
+                onTap: onOpenBills
+            )
+        }
         .dashboardShadow()
     }
 
@@ -551,9 +565,11 @@ struct HomeView: View {
 
     private var shoppingCard: some View {
         ShoppingCardView(
-            items: viewModel.recentShoppingItems,
+            items: viewModel.shoppingItems,
+            lists: viewModel.shoppingLists,
             showsAddButton: false,
             usesThinMaterial: true,
+            onOpenAll: onOpenShopping,
             onTogglePurchased: { item in
                 performAction(
                     successMessage: item.isPurchased
@@ -567,28 +583,6 @@ struct HomeView: View {
                         : .green,
                     operation: {
                         await viewModel.toggleShoppingItem(item)
-                    }
-                )
-            }
-        )
-        .dashboardShadow()
-    }
-
-    // MARK: - Bills Card
-
-    private var billsCard: some View {
-        BillsCardView(
-            bills: viewModel.upcomingBills,
-            title: "Upcoming Bills",
-            showsAddButton: false,
-            usesThinMaterial: true,
-            onMarkAsPaid: { bill in
-                performAction(
-                    successMessage: "\(bill.title) marked as paid",
-                    systemImage: "checkmark.circle.fill",
-                    color: .green,
-                    operation: {
-                        await viewModel.markBillAsPaid(bill)
                     }
                 )
             }

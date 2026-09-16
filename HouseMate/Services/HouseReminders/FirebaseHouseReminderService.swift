@@ -54,6 +54,14 @@ final class FirebaseHouseReminderService: HouseReminderServiceProtocol {
     }
 
     func createReminder(_ reminder: HouseReminderModel) async throws {
+        try await saveReminder(reminder)
+    }
+
+    func updateReminder(_ reminder: HouseReminderModel) async throws {
+        try await saveReminder(reminder)
+    }
+
+    private func saveReminder(_ reminder: HouseReminderModel) async throws {
         var data = try Firestore.Encoder().encode(reminder)
 
         if let nextReminderAt = reminder.nextNotificationDate() {

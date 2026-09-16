@@ -60,6 +60,25 @@ final class PollManager {
         polls[index].votesByUserId[userID] = option.optionId
     }
 
+    func removeVote(in poll: PollModel, userID: String) async throws {
+        guard poll.status == .active,
+              poll.selectedOptionId(for: userID) != nil else {
+            return
+        }
+
+        try await service.removeVote(
+            pollID: poll.pollId,
+            householdID: poll.householdId,
+            userID: userID
+        )
+
+        guard let index = polls.firstIndex(where: { $0.pollId == poll.pollId }) else {
+            return
+        }
+
+        polls[index].votesByUserId.removeValue(forKey: userID)
+    }
+
     func closePoll(_ poll: PollModel, currentUserID: String) async throws {
         guard poll.createdByUserId == currentUserID else {
             return

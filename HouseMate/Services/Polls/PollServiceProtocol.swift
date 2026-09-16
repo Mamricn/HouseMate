@@ -16,6 +16,8 @@ protocol PollServiceProtocol: AnyObject {
 
     func vote(pollID: String, householdID: String, userID: String, optionID: String) async throws
 
+    func removeVote(pollID: String, householdID: String, userID: String) async throws
+
     func closePoll(pollID: String, householdID: String) async throws
 
     func deletePoll(pollID: String, householdID: String) async throws

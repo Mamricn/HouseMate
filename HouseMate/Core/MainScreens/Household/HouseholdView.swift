@@ -20,6 +20,8 @@ final class HouseholdViewModel {
 
     var members: [HouseholdMemberModel]
 
+    let householdOwnerUserID: String
+
     var tasks: [TaskModel] {
         interactor.tasks
     }
@@ -27,14 +29,36 @@ final class HouseholdViewModel {
     var shoppingItems: [ShoppingItemModel] {
         interactor.shoppingItems
     }
+    var shoppingLists: [ShoppingCollection] { interactor.shoppingLists }
+    var selectedShoppingListID = "groceries"
+    func saveShoppingList(_ list: ShoppingCollection) async -> Bool {
+        guard let id = currentUser.householdId else { return false }
+        return await actionState.perform { try await interactor.saveShoppingList(list, householdID: id) }
+    }
+    func moveShoppingItem(_ item: ShoppingItemModel, to listID: String) async -> Bool {
+        await actionState.perform { try await interactor.moveShoppingItem(item, to: listID) }
+    }
 
     var bills: [BillModel] {
         interactor.bills
     }
 
-    init(currentUser: UserModel, members: [HouseholdMemberModel], interactor: CoreInteractor) {
+    var polls: [PollModel] {
+        interactor.polls
+    }
+
+    var reminders: [HouseReminderModel] {
+        interactor.houseReminders
+    }
+
+    var documents: [HouseholdDocumentModel] {
+        interactor.householdDocuments
+    }
+
+    init(currentUser: UserModel, members: [HouseholdMemberModel], householdOwnerUserID: String, interactor: CoreInteractor) {
         self.currentUser = currentUser
         self.members = members
+        self.householdOwnerUserID = householdOwnerUserID
         self.interactor = interactor
     }
 
@@ -44,6 +68,7 @@ final class HouseholdViewModel {
         self.init(
             currentUser: UserModel.mockList[0],
             members: HouseholdMemberModel.mockList,
+            householdOwnerUserID: HouseholdModel.mock.ownerUserId,
             interactor: CoreInteractor(container: container)
         )
     }
@@ -111,7 +136,8 @@ final class HouseholdViewModel {
 
     func addShoppingItem(
         name: String,
-        quantity: Int
+        quantity: Int,
+        listID: String? = nil
     ) async -> Bool {
         guard let householdId = currentUser.householdId else {
             return false
@@ -124,7 +150,8 @@ final class HouseholdViewModel {
             name: name,
             quantity: quantity,
             addedByUserId: currentUser.id,
-            isPurchased: false
+            isPurchased: false,
+            listId: listID ?? selectedShoppingListID
         )
 
         return await actionState.perform {
@@ -148,9 +175,9 @@ final class HouseholdViewModel {
         }
     }
 
-    func clearPurchasedShoppingItems() async -> Bool {
+    func clearPurchasedShoppingItems(listID: String? = nil) async -> Bool {
         await actionState.perform {
-            try await interactor.clearPurchasedShoppingItems()
+            try await interactor.clearPurchasedShoppingItems(listID: listID)
         }
     }
 
@@ -225,6 +252,171 @@ final class HouseholdViewModel {
         }
     }
 
+    // MARK: - Poll Actions
+
+    func addPoll(question: String, options: [String], expiresAt: Date?) async -> Bool {
+        guard let householdId = currentUser.householdId else { return false }
+
+        let poll = PollModel(
+            pollId: UUID().uuidString,
+            householdId: householdId,
+            createdAt: .now,
+            createdByUserId: currentUser.id,
+            question: question,
+            options: options.map { PollOptionModel(optionId: UUID().uuidString, text: $0) },
+            votesByUserId: [:],
+            status: .active,
+            expiresAt: expiresAt
+        )
+
+        return await actionState.perform {
+            try await interactor.createPoll(poll)
+        }
+    }
+
+    func vote(in poll: PollModel, for option: PollOptionModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.vote(in: poll, option: option, userID: currentUser.id)
+        }
+    }
+
+    func removeVote(in poll: PollModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.removeVote(in: poll, userID: currentUser.id)
+        }
+    }
+
+    func closePoll(_ poll: PollModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.closePoll(poll, currentUserID: currentUser.id)
+        }
+    }
+
+    func deletePoll(_ poll: PollModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.deletePoll(poll, currentUserID: currentUser.id)
+        }
+    }
+
+    // MARK: - Reminder Actions
+
+    func addReminder(
+        title: String,
+        details: String?,
+        firstOccurrenceDate: Date,
+        recurrence: HouseReminderRecurrence,
+        category: HouseReminderCategory,
+        reminderAdvance: HouseReminderAdvance
+    ) async -> Bool {
+        guard let householdId = currentUser.householdId else { return false }
+
+        let reminder = HouseReminderModel(
+            reminderId: UUID().uuidString,
+            householdId: householdId,
+            createdAt: .now,
+            createdByUserId: currentUser.id,
+            title: title,
+            details: details,
+            firstOccurrenceDate: firstOccurrenceDate,
+            recurrence: recurrence,
+            category: category,
+            reminderAdvance: reminderAdvance
+        )
+
+        return await actionState.perform {
+            try await interactor.createHouseReminder(reminder)
+        }
+    }
+
+    func deleteReminder(_ reminder: HouseReminderModel) async -> Bool {
+        await actionState.perform {
+            try await interactor.deleteHouseReminder(
+                reminder,
+                currentUserID: currentUser.id,
+                ownerUserID: householdOwnerUserID
+            )
+        }
+    }
+
+    func updateReminder(
+        _ reminder: HouseReminderModel,
+        title: String,
+        details: String?,
+        firstOccurrenceDate: Date,
+        recurrence: HouseReminderRecurrence,
+        category: HouseReminderCategory,
+        reminderAdvance: HouseReminderAdvance
+    ) async -> Bool {
+        var updatedReminder = reminder
+        updatedReminder.title = title
+        updatedReminder.details = details
+        updatedReminder.firstOccurrenceDate = firstOccurrenceDate
+        updatedReminder.recurrence = recurrence
+        updatedReminder.category = category
+        updatedReminder.reminderAdvance = reminderAdvance
+
+        return await actionState.perform {
+            try await interactor.updateHouseReminder(
+                updatedReminder,
+                currentUserID: currentUser.id,
+                ownerUserID: householdOwnerUserID
+            )
+        }
+    }
+
+    // MARK: - Document Actions
+
+    func addDocument(
+        title: String,
+        category: HouseholdDocumentCategory,
+        notes: String?,
+        storeName: String?,
+        amount: Double?,
+        purchaseDate: Date?,
+        warrantyExpiresAt: Date?,
+        serialNumber: String?,
+        attachment: DocumentAttachmentDraft
+    ) async -> Bool {
+        guard let householdId = currentUser.householdId else { return false }
+        let document = HouseholdDocumentModel(
+            documentId: UUID().uuidString,
+            householdId: householdId,
+            createdAt: .now,
+            createdByUserId: currentUser.id,
+            title: title,
+            category: category,
+            notes: notes,
+            fileName: attachment.fileName,
+            fileURL: "",
+            storagePath: "",
+            contentType: attachment.contentType,
+            storeName: storeName,
+            amount: amount,
+            purchaseDate: purchaseDate,
+            warrantyExpiresAt: warrantyExpiresAt,
+            serialNumber: serialNumber
+        )
+        return await actionState.perform {
+            try await interactor.createHouseholdDocument(document, attachment: attachment)
+        }
+    }
+
+    func deleteDocument(_ document: HouseholdDocumentModel) async -> Bool {
+        guard document.createdByUserId == currentUser.id
+                || currentUser.id == householdOwnerUserID else { return false }
+        return await actionState.perform {
+            try await interactor.deleteHouseholdDocument(document)
+        }
+    }
+
+    func updateDocument(_ document: HouseholdDocumentModel) async -> Bool {
+        guard document.createdByUserId == currentUser.id
+                || currentUser.id == householdOwnerUserID else { return false }
+        return await actionState.perform {
+            try await interactor.updateHouseholdDocument(document)
+        }
+    }
+
     func refreshData() async {
         guard let householdID = currentUser.householdId else {
             return
@@ -234,6 +426,9 @@ final class HouseholdViewModel {
             try await interactor.fetchTasks(householdID: householdID, currentUserID: currentUser.id)
             try await interactor.fetchShoppingItems(householdID: householdID)
             try await interactor.fetchBills(householdID: householdID)
+            try await interactor.fetchPolls(householdID: householdID)
+            try await interactor.fetchHouseReminders(householdID: householdID)
+            try await interactor.fetchHouseholdDocuments(householdID: householdID)
         }
     }
 }
@@ -244,18 +439,36 @@ private enum HouseholdSheet: String, Identifiable {
     case chore
     case shoppingItem
     case bill
+    case poll
+    case reminder
 
     var id: String {
         rawValue
     }
 }
 
+private enum HouseholdFeature: String, Hashable {
+    case bills
+    case cleaning
+    case shopping
+    case polls
+    case reminders
+    case documents
+}
+
 struct HouseholdView: View {
 
     @Bindable var viewModel: HouseholdViewModel
+    var onOpenBills: () -> Void = {}
+    var onOpenCleaning: () -> Void = {}
+    var onOpenShopping: () -> Void = {}
+    var onOpenPolls: () -> Void = {}
+    var onOpenReminders: () -> Void = {}
+    var onOpenDocuments: () -> Void = {}
 
     @State private var activeSheet: HouseholdSheet?
     @State private var toast: AppToast?
+    @State private var isHeaderElevated = false
 
     var body: some View {
         ZStack {
@@ -271,31 +484,267 @@ struct HouseholdView: View {
     // MARK: - Content
 
     private var content: some View {
-        ScrollView {
-            LazyVStack(
-                alignment: .leading,
-                spacing: 20
-            ) {
-                scheduleCard
-                shoppingCard
-                billsCard
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 18)
-            .padding(.bottom, 35)
-        }
-        .refreshable {
-            await viewModel.refreshData()
+        VStack(spacing: 0) {
+            householdHeader
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 12)
+                .background {
+                    if isHeaderElevated {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .ignoresSafeArea(edges: .top)
+                            .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: isHeaderElevated)
+                .zIndex(1)
 
-            if let errorMessage = viewModel.actionState.errorMessage {
-                showToast(
-                    message: errorMessage,
-                    systemImage: "exclamationmark.triangle.fill",
-                    color: .red
-                )
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 20
+                ) {
+                    primaryFeatures
+                    secondaryFeatures
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 35)
             }
+            .houseMatePullToRefresh {
+                await viewModel.refreshData()
+
+                if let errorMessage = viewModel.actionState.errorMessage {
+                    showToast(
+                        message: errorMessage,
+                        systemImage: "exclamationmark.triangle.fill",
+                        color: .red
+                    )
+                }
+            }
+            .scrollIndicators(.hidden)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top > 4
+            } action: { _, isScrolled in
+                isHeaderElevated = isScrolled
+            }
+        }
+    }
+
+    private var householdHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Household")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+
+            Text("Everything your home needs, in one place")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var primaryFeatures: some View {
+        HStack(alignment: .top, spacing: 12) {
+            featureLink(
+                .bills,
+                title: "Bills",
+                systemImage: "creditcard.fill",
+                assetName: "HouseholdBills",
+                colors: [.blue, .indigo],
+                isLarge: true
+            )
+
+            featureLink(
+                .cleaning,
+                title: "Cleaning",
+                systemImage: "sparkles",
+                assetName: "HouseholdCleaning",
+                colors: [.cyan, .blue],
+                isLarge: true
+            )
+        }
+    }
+
+    private var secondaryFeatures: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ],
+            spacing: 12
+        ) {
+            featureLink(
+                .shopping,
+                title: "Shopping",
+                systemImage: "cart.fill",
+                assetName: "HouseholdShopping",
+                colors: [.mint, .teal]
+            )
+
+            featureLink(
+                .polls,
+                title: "Polls",
+                systemImage: "chart.bar.fill",
+                assetName: "HouseholdPolls",
+                colors: [.purple, .indigo]
+            )
+
+            featureLink(
+                .reminders,
+                title: "Reminders",
+                systemImage: "bell.fill",
+                assetName: "HouseholdReminders",
+                colors: [.orange, .pink]
+            )
+
+            featureLink(
+                .documents,
+                title: "Documents",
+                systemImage: "folder.fill",
+                assetName: "HouseholdDocuments",
+                colors: [.blue, .cyan]
+            )
+        }
+    }
+
+    private func featureLink(
+        _ feature: HouseholdFeature,
+        title: String,
+        systemImage: String,
+        assetName: String,
+        colors: [Color],
+        isLarge: Bool = false
+    ) -> some View {
+        Group {
+            if feature == .bills || feature == .cleaning || feature == .shopping || feature == .polls || feature == .reminders || feature == .documents {
+                Button(action: featureAction(for: feature)) {
+                    featureTile(
+                        title: title,
+                        systemImage: systemImage,
+                        assetName: assetName,
+                        colors: colors,
+                        isLarge: isLarge
+                    )
+                }
+            } else {
+                NavigationLink {
+                    featureDestination(feature)
+                } label: {
+                    featureTile(
+                        title: title,
+                        systemImage: systemImage,
+                        assetName: assetName,
+                        colors: colors,
+                        isLarge: isLarge
+                    )
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func featureAction(for feature: HouseholdFeature) -> () -> Void {
+        switch feature {
+        case .bills: onOpenBills
+        case .cleaning: onOpenCleaning
+        case .shopping: onOpenShopping
+        case .polls: onOpenPolls
+        case .reminders: onOpenReminders
+        case .documents: onOpenDocuments
+        }
+    }
+
+    private func featureTile(
+        title: String,
+        systemImage: String,
+        assetName: String,
+        colors: [Color],
+        isLarge: Bool
+    ) -> some View {
+            HouseholdFeatureTile(
+                title: title,
+                systemImage: systemImage,
+                assetName: assetName,
+                colors: colors,
+                isLarge: isLarge
+            )
+    }
+
+    @ViewBuilder
+    private func featureDestination(_ feature: HouseholdFeature) -> some View {
+        ZStack {
+            backgroundGradient
+
+            switch feature {
+            case .bills:
+                BillsView(
+                    bills: viewModel.bills,
+                    onAdd: { activeSheet = .bill },
+                    onMarkAsPaid: { bill in
+                        performAction(
+                            successMessage: "\(bill.title) marked as paid",
+                            systemImage: "checkmark.circle.fill",
+                            color: .green,
+                            operation: { await viewModel.markBillAsPaid(bill) }
+                        )
+                    },
+                    onDelete: { bill in
+                        performAction(
+                            successMessage: "\(bill.title) deleted",
+                            systemImage: "trash.fill",
+                            color: .red,
+                            operation: { await viewModel.deleteBill(bill) }
+                        )
+                    }
+                )
+                    .navigationTitle("Bills")
+
+            case .cleaning:
+                detailScrollView { scheduleCard }
+                    .navigationTitle("Cleaning Schedule")
+
+            case .shopping:
+                detailScrollView { shoppingCard }
+                    .navigationTitle("Shopping List")
+
+            case .polls:
+                detailScrollView { pollsCard }
+                    .navigationTitle("Polls")
+
+            case .reminders:
+                detailScrollView { remindersCard }
+                    .navigationTitle("Reminders")
+
+            case .documents:
+                unavailableFeature("Documents", systemImage: "folder.fill")
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func detailScrollView<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        ScrollView {
+            content()
+                .padding(18)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private func unavailableFeature(
+        _ title: String,
+        systemImage: String
+    ) -> some View {
+        ContentUnavailableView(
+            "\(title) are moving here",
+            systemImage: systemImage,
+            description: Text("This section will be connected in the next UI step.")
+        )
     }
 
     // MARK: - Schedule
@@ -422,6 +871,64 @@ struct HouseholdView: View {
         .householdCardShadow()
     }
 
+    // MARK: - Polls
+
+    private var pollsCard: some View {
+        HouseholdPollsCardView(
+            polls: viewModel.polls,
+            currentUserId: viewModel.currentUser.id,
+            members: viewModel.members,
+            showsAddButton: true,
+            onAdd: { activeSheet = .poll },
+            onVote: { poll, option in
+                performAction(
+                    successMessage: "Vote submitted",
+                    systemImage: "checkmark.circle.fill",
+                    color: .green,
+                    operation: { await viewModel.vote(in: poll, for: option) }
+                )
+            },
+            onClose: { poll in
+                performAction(
+                    successMessage: "Poll closed",
+                    systemImage: "checkmark.circle",
+                    color: .orange,
+                    operation: { await viewModel.closePoll(poll) }
+                )
+            },
+            onDelete: { poll in
+                performAction(
+                    successMessage: "Poll deleted",
+                    systemImage: "trash.fill",
+                    color: .red,
+                    operation: { await viewModel.deletePoll(poll) }
+                )
+            }
+        )
+        .householdCardShadow()
+    }
+
+    // MARK: - Reminders
+
+    private var remindersCard: some View {
+        HouseRemindersCardView(
+            reminders: viewModel.reminders,
+            currentUserId: viewModel.currentUser.id,
+            householdOwnerUserId: viewModel.householdOwnerUserID,
+            showsAddButton: true,
+            onAdd: { activeSheet = .reminder },
+            onDelete: { reminder in
+                performAction(
+                    successMessage: "\(reminder.title) deleted",
+                    systemImage: "trash.fill",
+                    color: .red,
+                    operation: { await viewModel.deleteReminder(reminder) }
+                )
+            }
+        )
+        .householdCardShadow()
+    }
+
     // MARK: - Sheets
 
     @ViewBuilder
@@ -437,6 +944,12 @@ struct HouseholdView: View {
 
         case .bill:
             billSheet
+
+        case .poll:
+            pollSheet
+
+        case .reminder:
+            reminderSheet
         }
     }
 
@@ -477,7 +990,7 @@ struct HouseholdView: View {
     }
 
     private var shoppingItemSheet: some View {
-        AddShoppingItemView { name, quantity in
+        AddShoppingItemView(lists: viewModel.shoppingLists, initialListID: viewModel.selectedShoppingListID, onListSelected: { viewModel.selectedShoppingListID = $0 }) { name, quantity in
             performAction(
                 successMessage: "\(name) added",
                 systemImage: "cart.badge.plus",
@@ -518,6 +1031,54 @@ struct HouseholdView: View {
                     recurrence: recurrence,
                     notificationAdvance: notificationAdvance
                 )
+                }
+            )
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var pollSheet: some View {
+        AddPollView { question, options, expiresAt in
+            performAction(
+                successMessage: "Poll created",
+                systemImage: "chart.bar.doc.horizontal",
+                color: .green,
+                operation: {
+                    await viewModel.addPoll(
+                        question: question,
+                        options: options,
+                        expiresAt: expiresAt
+                    )
+                }
+            )
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var reminderSheet: some View {
+        AddHouseReminderView {
+            title,
+            details,
+            firstOccurrenceDate,
+            recurrence,
+            category,
+            reminderAdvance in
+
+            performAction(
+                successMessage: "\(title) added",
+                systemImage: "bell.badge.fill",
+                color: .green,
+                operation: {
+                    await viewModel.addReminder(
+                        title: title,
+                        details: details,
+                        firstOccurrenceDate: firstOccurrenceDate,
+                        recurrence: recurrence,
+                        category: category,
+                        reminderAdvance: reminderAdvance
+                    )
                 }
             )
         }

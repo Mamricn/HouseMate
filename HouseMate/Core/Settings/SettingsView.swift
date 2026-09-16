@@ -51,6 +51,11 @@ struct SettingsView: View {
             aboutSection
             accountSection
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            settingsBackground
+                .ignoresSafeArea()
+        }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -75,6 +80,32 @@ struct SettingsView: View {
             Text(weeklyAssignmentResult ?? "")
         }
 #endif
+    }
+
+    private var settingsBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.89, green: 0.95, blue: 1.00),
+                    Color(red: 0.95, green: 0.89, blue: 0.98),
+                    Color(red: 0.91, green: 0.96, blue: 1.00)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.blue.opacity(0.12))
+                .frame(width: 260, height: 260)
+                .blur(radius: 48)
+                .offset(x: 170, y: -300)
+
+            Circle()
+                .fill(Color.purple.opacity(0.10))
+                .frame(width: 250, height: 250)
+                .blur(radius: 45)
+                .offset(x: -170, y: 280)
+        }
     }
 
     // MARK: - Profile
@@ -109,6 +140,7 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
         }
+        .listRowBackground(settingsRowBackground)
     }
 
     private var profileImage: some View {
@@ -138,46 +170,45 @@ struct SettingsView: View {
                 }
             }
 
-            Toggle(
-                "Automatic Weekly Assignment",
-                isOn: Binding(
-                    get: { automaticWeeklyAssignment },
-                    set: { updateAutomaticWeeklyAssignment(to: $0) }
+            if canManageAutomaticAssignment {
+                Toggle(
+                    "Automatic Weekly Assignment",
+                    isOn: Binding(
+                        get: { automaticWeeklyAssignment },
+                        set: { updateAutomaticWeeklyAssignment(to: $0) }
+                    )
                 )
-            )
-            .disabled(!canManageAutomaticAssignment || isUpdatingAutomaticAssignment)
+                .disabled(isUpdatingAutomaticAssignment)
 
 #if DEVELOPMENT
-            Button {
-                runWeeklyAssignmentNow()
-            } label: {
-                if isRunningWeeklyAssignment {
-                    ProgressView().frame(maxWidth: .infinity)
-                } else {
-                    Text("Run Weekly Assignment Now")
-                        .frame(maxWidth: .infinity)
+                Button {
+                    runWeeklyAssignmentNow()
+                } label: {
+                    if isRunningWeeklyAssignment {
+                        ProgressView().frame(maxWidth: .infinity)
+                    } else {
+                        Text("Run Weekly Assignment Now")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
-            }
-            .disabled(
-                !canManageAutomaticAssignment
-                    || !automaticWeeklyAssignment
-                    || isRunningWeeklyAssignment
-            )
+                .disabled(!automaticWeeklyAssignment || isRunningWeeklyAssignment)
 #endif
+            }
         } header: {
             Text("Household")
         } footer: {
-            Text(
-                !canManageAutomaticAssignment
-                    ? "Only the household owner can change weekly assignments."
-                    : automaticWeeklyAssignment
+            if canManageAutomaticAssignment {
+                Text(
+                    automaticWeeklyAssignment
                     ? "Chores will be fairly rotated between housemates each week."
                     : "Chores are assigned manually."
-            )
+                )
+            }
         }
         .task {
             automaticWeeklyAssignment = household?.automaticWeeklyAssignmentEnabled ?? false
         }
+        .listRowBackground(settingsRowBackground)
     }
 
     private var canManageAutomaticAssignment: Bool {
@@ -252,6 +283,7 @@ struct SettingsView: View {
         .onChange(of: taskNotificationsEnabled) { _, _ in updateNotificationPreferences() }
         .onChange(of: houseReminderNotificationsEnabled) { _, _ in updateNotificationPreferences() }
         .onChange(of: billNotificationsEnabled) { _, _ in updateNotificationPreferences() }
+        .listRowBackground(settingsRowBackground)
     }
 
     private func updateNotificationPreferences() {
@@ -307,6 +339,7 @@ struct SettingsView: View {
                 value: user.householdId ?? "Not joined"
             )
         }
+        .listRowBackground(settingsRowBackground)
     }
 
     // MARK: - Account
@@ -341,6 +374,11 @@ struct SettingsView: View {
                 }
             }
         }
+        .listRowBackground(settingsRowBackground)
+    }
+
+    private var settingsRowBackground: some View {
+        Color.white.opacity(0.48)
     }
 
     private var appVersion: String {

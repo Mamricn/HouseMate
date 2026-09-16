@@ -23,7 +23,7 @@ struct AddBillView: View {
 
     @State private var title = ""
     @State private var amountText = ""
-    @State private var dueDate = Date.now
+    @State private var dueDate: Date
 
     @State private var category: BillCategory = .other
 
@@ -31,6 +31,22 @@ struct AddBillView: View {
     @State private var recurrence: BillRecurrence = .monthly
     @State private var notificationAdvance: HouseReminderAdvance = .none
     @State private var hasAttemptedSubmit = false
+
+    init(
+        initialDueDate: Date = .now,
+        onSave: @escaping (
+            String,
+            Double,
+            Date,
+            BillCategory,
+            Bool,
+            BillRecurrence?,
+            HouseReminderAdvance
+        ) -> Void
+    ) {
+        self.onSave = onSave
+        _dueDate = State(initialValue: initialDueDate)
+    }
 
     var body: some View {
         NavigationStack {

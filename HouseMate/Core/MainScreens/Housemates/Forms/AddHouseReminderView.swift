@@ -22,14 +22,38 @@ struct AddHouseReminderView: View {
         _ reminderAdvance: HouseReminderAdvance
     ) -> Void
 
-    @State private var title = ""
-    @State private var details = ""
+    private let reminder: HouseReminderModel?
 
-    @State private var firstOccurrenceDate = Date.now
-    @State private var recurrence: HouseReminderRecurrence = .never
-    @State private var category: HouseReminderCategory = .other
-    @State private var reminderAdvance: HouseReminderAdvance = .none
+    @State private var title: String
+    @State private var details: String
+
+    @State private var firstOccurrenceDate: Date
+    @State private var recurrence: HouseReminderRecurrence
+    @State private var category: HouseReminderCategory
+    @State private var reminderAdvance: HouseReminderAdvance
     @State private var hasAttemptedSubmit = false
+
+    init(
+        reminder: HouseReminderModel? = nil,
+        initialDate: Date = .now,
+        onSave: @escaping (
+            String,
+            String?,
+            Date,
+            HouseReminderRecurrence,
+            HouseReminderCategory,
+            HouseReminderAdvance
+        ) -> Void
+    ) {
+        self.reminder = reminder
+        self.onSave = onSave
+        _title = State(initialValue: reminder?.title ?? "")
+        _details = State(initialValue: reminder?.details ?? "")
+        _firstOccurrenceDate = State(initialValue: reminder?.firstOccurrenceDate ?? initialDate)
+        _recurrence = State(initialValue: reminder?.recurrence ?? .never)
+        _category = State(initialValue: reminder?.category ?? .other)
+        _reminderAdvance = State(initialValue: reminder?.reminderAdvance ?? .none)
+    }
 
     var body: some View {
         NavigationStack {
@@ -39,7 +63,7 @@ struct AddHouseReminderView: View {
                 scheduleSection
                 notificationSection
             }
-            .navigationTitle("New Reminder")
+            .navigationTitle(reminder == nil ? "New Reminder" : "Edit Reminder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 cancellationToolbar
@@ -98,12 +122,20 @@ struct AddHouseReminderView: View {
 
     private var scheduleSection: some View {
         Section("Schedule") {
-            DatePicker(
-                "First Date",
-                selection: $firstOccurrenceDate,
-                in: startOfToday...,
-                displayedComponents: .date
-            )
+            if reminder == nil {
+                DatePicker(
+                    "First Date",
+                    selection: $firstOccurrenceDate,
+                    in: startOfToday...,
+                    displayedComponents: .date
+                )
+            } else {
+                DatePicker(
+                    "First Date",
+                    selection: $firstOccurrenceDate,
+                    displayedComponents: .date
+                )
+            }
 
             Picker(
                 "Repeats",
@@ -159,7 +191,7 @@ struct AddHouseReminderView: View {
         ToolbarItem(
             placement: .confirmationAction
         ) {
-            Button("Add") {
+            Button(reminder == nil ? "Add" : "Save") {
                 saveReminder()
             }
         }

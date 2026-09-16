@@ -13,6 +13,7 @@ struct TaskCardView: View {
 
     var showsAddButton: Bool = true
     var usesThinMaterial: Bool = true
+    var onOpenAll: () -> Void = {}
     var onToggleStatus: (TaskModel) -> Void = { _ in }
 
     var body: some View {
@@ -46,11 +47,26 @@ struct TaskCardView: View {
 
     private var header: some View {
         HStack {
-            Text("Today's Tasks")
-                .font(.title3)
-                .fontWeight(.semibold)
+            Button {
+                HapticFeedback.selection()
+                onOpenAll()
+            } label: {
+                HStack {
+                    Text("Today's Tasks")
+                        .font(.title3)
+                        .fontWeight(.semibold)
 
-            Spacer()
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary.opacity(0.7))
+                }
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open all household tasks")
 
             if showsAddButton {
                 Button {

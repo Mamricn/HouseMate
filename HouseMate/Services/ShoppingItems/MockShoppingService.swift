@@ -9,6 +9,20 @@ import Foundation
 final class MockShoppingService: ShoppingServiceProtocol {
 
     private var items: [ShoppingItemModel]
+    func moveItem(_ item: ShoppingItemModel, to listID: String) async throws {
+        if let index = items.firstIndex(where: { $0.id == item.id && $0.householdId == item.householdId }) {
+            items[index].listId = listID
+        }
+    }
+    private var lists: [String: [ShoppingCollection]] = [:]
+
+    func fetchLists(householdID: String) async throws -> [ShoppingCollection] { lists[householdID] ?? [] }
+    func saveList(_ list: ShoppingCollection, householdID: String) async throws {
+        var current = lists[householdID] ?? []
+        current.removeAll { $0.id == list.id }
+        current.append(list)
+        lists[householdID] = current
+    }
 
     init(items: [ShoppingItemModel]) {
         self.items = items

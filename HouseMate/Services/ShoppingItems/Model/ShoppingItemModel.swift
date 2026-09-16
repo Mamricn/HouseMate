@@ -21,6 +21,8 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
     var addedByUserId: String
     var isPurchased: Bool
     var purchasedAt: Date?
+    var listId: String?
+    var shoppingListID: String { listId ?? "groceries" }
     
     
     init(
@@ -31,7 +33,8 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
         quantity: Int = 1,
         addedByUserId: String,
         isPurchased: Bool = false,
-        purchasedAt: Date? = nil
+        purchasedAt: Date? = nil,
+        listId: String? = nil
     ) {
         self.itemId = itemId
         self.householdId = householdId
@@ -41,6 +44,7 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
         self.addedByUserId = addedByUserId
         self.isPurchased = isPurchased
         self.purchasedAt = purchasedAt
+        self.listId = listId
     }
     
     
@@ -53,6 +57,7 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
         case addedByUserId = "added_by_user_id"
         case isPurchased = "is_purchased"
         case purchasedAt = "purchased_at"
+        case listId = "list_id"
     }
     
     
@@ -71,6 +76,14 @@ struct ShoppingItemModel: Identifiable, Codable, Equatable {
         
         return dict.compactMapValues { $0 }
     }
+}
+
+struct ShoppingCollection: Identifiable, Codable, Equatable {
+    var id: String
+    var name: String
+    var symbol: String
+
+    static let groceries = ShoppingCollection(id: "groceries", name: "Groceries", symbol: "cart.fill")
 }
 
 

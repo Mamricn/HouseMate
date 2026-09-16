@@ -19,6 +19,7 @@ final class DependencyContainer {
     let householdBoardManager: HouseholdBoardManager
     let pollManager: PollManager
     let houseReminderManager: HouseReminderManager
+    let householdDocumentManager: HouseholdDocumentManager
     let notificationManager: NotificationManager
     let localNotificationService: any LocalNotificationServiceProtocol
     let remoteNotificationService: any RemoteNotificationServiceProtocol
@@ -34,6 +35,7 @@ final class DependencyContainer {
         householdBoardManager: HouseholdBoardManager,
         pollManager: PollManager,
         houseReminderManager: HouseReminderManager,
+        householdDocumentManager: HouseholdDocumentManager,
         notificationManager: NotificationManager,
         localNotificationService: any LocalNotificationServiceProtocol,
         remoteNotificationService: any RemoteNotificationServiceProtocol,
@@ -48,6 +50,7 @@ final class DependencyContainer {
         self.householdBoardManager = householdBoardManager
         self.pollManager = pollManager
         self.houseReminderManager = houseReminderManager
+        self.householdDocumentManager = householdDocumentManager
         self.notificationManager = notificationManager
         self.localNotificationService = localNotificationService
         self.remoteNotificationService = remoteNotificationService
@@ -85,6 +88,9 @@ final class DependencyContainer {
                     service: MockHouseReminderService(),
                     notificationService: localNotificationService
                 ),
+                householdDocumentManager: HouseholdDocumentManager(
+                    service: MockHouseholdDocumentService()
+                ),
                 notificationManager: NotificationManager(service: MockNotificationService()),
                 localNotificationService: localNotificationService,
                 remoteNotificationService: MockRemoteNotificationService(),
@@ -111,6 +117,9 @@ final class DependencyContainer {
                 houseReminderManager: HouseReminderManager(
                     service: FirebaseHouseReminderService(),
                     notificationService: localNotificationService
+                ),
+                householdDocumentManager: HouseholdDocumentManager(
+                    service: FirebaseHouseholdDocumentService()
                 ),
                 notificationManager: NotificationManager(service: FirebaseNotificationService()),
                 localNotificationService: localNotificationService,

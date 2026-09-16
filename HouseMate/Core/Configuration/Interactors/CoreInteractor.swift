@@ -40,6 +40,9 @@ struct CoreInteractor {
     private let houseReminderManager:
         HouseReminderManager
 
+    private let householdDocumentManager:
+        HouseholdDocumentManager
+
     private let notificationManager:
         NotificationManager
 
@@ -64,6 +67,7 @@ struct CoreInteractor {
         self.householdBoardManager = container.householdBoardManager
         self.pollManager = container.pollManager
         self.houseReminderManager = container.houseReminderManager
+        self.householdDocumentManager = container.householdDocumentManager
         self.notificationManager = container.notificationManager
         self.localNotificationService = container.localNotificationService
         self.remoteNotificationService = container.remoteNotificationService
@@ -341,6 +345,13 @@ struct CoreInteractor {
     var shoppingItems: [ShoppingItemModel] {
         shoppingManager.items
     }
+    var shoppingLists: [ShoppingCollection] { shoppingManager.lists }
+    func saveShoppingList(_ list: ShoppingCollection, householdID: String) async throws {
+        try await shoppingManager.saveList(list, householdID: householdID)
+    }
+    func moveShoppingItem(_ item: ShoppingItemModel, to listID: String) async throws {
+        try await shoppingManager.moveItem(item, to: listID)
+    }
 
     func fetchShoppingItems(householdID: String) async throws {
         try await shoppingManager.fetchItems(householdID: householdID)
@@ -358,8 +369,8 @@ struct CoreInteractor {
         try await shoppingManager.deleteItem(item)
     }
 
-    func clearPurchasedShoppingItems() async throws {
-        try await shoppingManager.clearPurchasedItems()
+    func clearPurchasedShoppingItems(listID: String? = nil) async throws {
+        try await shoppingManager.clearPurchasedItems(listID: listID)
     }
 
     func clearShoppingItems() {
@@ -444,6 +455,10 @@ struct CoreInteractor {
         try await pollManager.vote(in: poll, option: option, userID: userID)
     }
 
+    func removeVote(in poll: PollModel, userID: String) async throws {
+        try await pollManager.removeVote(in: poll, userID: userID)
+    }
+
     func closePoll(_ poll: PollModel, currentUserID: String) async throws {
         try await pollManager.closePoll(poll, currentUserID: currentUserID)
     }
@@ -470,6 +485,18 @@ struct CoreInteractor {
         try await houseReminderManager.createReminder(reminder)
     }
 
+    func updateHouseReminder(
+        _ reminder: HouseReminderModel,
+        currentUserID: String,
+        ownerUserID: String
+    ) async throws {
+        try await houseReminderManager.updateReminder(
+            reminder,
+            currentUserID: currentUserID,
+            ownerUserID: ownerUserID
+        )
+    }
+
     func deleteHouseReminder(_ reminder: HouseReminderModel, currentUserID: String, ownerUserID: String) async throws {
         try await houseReminderManager.deleteReminder(
             reminder,
@@ -480,6 +507,35 @@ struct CoreInteractor {
 
     func clearHouseReminders() {
         houseReminderManager.clearReminders()
+    }
+
+    // MARK: - Documents
+
+    var householdDocuments: [HouseholdDocumentModel] {
+        householdDocumentManager.documents
+    }
+
+    func fetchHouseholdDocuments(householdID: String) async throws {
+        try await householdDocumentManager.fetchDocuments(householdID: householdID)
+    }
+
+    func createHouseholdDocument(
+        _ document: HouseholdDocumentModel,
+        attachment: DocumentAttachmentDraft
+    ) async throws {
+        try await householdDocumentManager.createDocument(document, attachment: attachment)
+    }
+
+    func updateHouseholdDocument(_ document: HouseholdDocumentModel) async throws {
+        try await householdDocumentManager.updateDocument(document)
+    }
+
+    func deleteHouseholdDocument(_ document: HouseholdDocumentModel) async throws {
+        try await householdDocumentManager.deleteDocument(document)
+    }
+
+    func clearHouseholdDocuments() {
+        householdDocumentManager.clearDocuments()
     }
 
     // MARK: - Notifications

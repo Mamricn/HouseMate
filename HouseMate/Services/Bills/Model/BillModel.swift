@@ -123,6 +123,26 @@ enum BillCategory: String, Codable, CaseIterable {
     case councilTax
     case subscription
     case other
+
+    var title: String {
+        switch self {
+        case .electricity: "Electricity"
+        case .water: "Water"
+        case .internet: "Internet"
+        case .rent: "Rent"
+        case .gas: "Gas"
+        case .councilTax: "Council Tax"
+        case .subscription: "Subscriptions"
+        case .other: "Other"
+        }
+    }
+
+    var rowTitle: String {
+        switch self {
+        case .subscription: "Subscription"
+        default: title
+        }
+    }
     
     var systemImage: String {
         switch self {

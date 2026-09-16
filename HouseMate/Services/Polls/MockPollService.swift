@@ -41,6 +41,16 @@ final class MockPollService: PollServiceProtocol {
         polls[index].votesByUserId[userID] = optionID
     }
 
+    func removeVote(pollID: String, householdID: String, userID: String) async throws {
+        guard let index = polls.firstIndex(where: {
+            $0.pollId == pollID && $0.householdId == householdID
+        }) else {
+            return
+        }
+
+        polls[index].votesByUserId.removeValue(forKey: userID)
+    }
+
     func closePoll(pollID: String, householdID: String) async throws {
         guard let index = polls.firstIndex(where: {
             $0.pollId == pollID && $0.householdId == householdID

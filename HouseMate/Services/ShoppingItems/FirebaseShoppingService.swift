@@ -10,6 +10,33 @@ import FirebaseFirestore
 final class FirebaseShoppingService: ShoppingServiceProtocol {
 
     private let database: Firestore
+    func moveItem(_ item: ShoppingItemModel, to listID: String) async throws {
+        try await itemsCollection(householdID: item.householdId).document(item.id).updateData(["list_id": listID])
+    }
+
+    private func listsCollection(_ householdID: String) -> CollectionReference {
+        database.collection("households").document(householdID).collection("shopping_lists")
+    }
+
+    func fetchLists(householdID: String) async throws -> [ShoppingCollection] {
+        let snapshot = try await listsCollection(householdID).getDocuments()
+        return try snapshot.documents.map { try $0.data(as: ShoppingCollection.self) }
+    }
+
+    func saveList(_ list: ShoppingCollection, householdID: String) async throws {
+        let data = try Firestore.Encoder().encode(list)
+        try await listsCollection(householdID).document(list.id).setData(data)
+    }
+
+    func observeLists(householdID: String, onChange: @escaping (Result<[ShoppingCollection], Error>) -> Void) -> ServiceObservation? {
+        let listener = listsCollection(householdID).addSnapshotListener { snapshot, error in
+            if let error { onChange(.failure(error)); return }
+            do {
+                onChange(.success(try snapshot?.documents.map { try $0.data(as: ShoppingCollection.self) } ?? []))
+            } catch { onChange(.failure(error)) }
+        }
+        return ServiceObservation(cancellation: listener.remove)
+    }
 
     init(database: Firestore = Firestore.firestore()) {
         self.database = database

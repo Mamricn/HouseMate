@@ -67,6 +67,14 @@ final class FirebasePollService: PollServiceProtocol {
             ])
     }
 
+    func removeVote(pollID: String, householdID: String, userID: String) async throws {
+        try await pollsCollection(householdID: householdID)
+            .document(pollID)
+            .updateData([
+                "votes_by_user_id.\(userID)": FieldValue.delete()
+            ])
+    }
+
     func closePoll(pollID: String, householdID: String) async throws {
         try await pollsCollection(householdID: householdID)
             .document(pollID)

@@ -220,6 +220,7 @@ final class AppState {
         interactor.clearBoardPosts()
         interactor.clearPolls()
         interactor.clearHouseReminders()
+        interactor.clearHouseholdDocuments()
         interactor.clearNotifications()
     }
 }

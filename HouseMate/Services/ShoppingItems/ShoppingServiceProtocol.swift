@@ -7,6 +7,10 @@ import Foundation
 
 @MainActor
 protocol ShoppingServiceProtocol: AnyObject {
+    func fetchLists(householdID: String) async throws -> [ShoppingCollection]
+    func observeLists(householdID: String, onChange: @escaping (Result<[ShoppingCollection], Error>) -> Void) -> ServiceObservation?
+    func saveList(_ list: ShoppingCollection, householdID: String) async throws
+    func moveItem(_ item: ShoppingItemModel, to listID: String) async throws
 
     func fetchActiveItems(householdID: String, limit: Int) async throws -> [ShoppingItemModel]
 
@@ -26,6 +30,7 @@ protocol ShoppingServiceProtocol: AnyObject {
 }
 
 extension ShoppingServiceProtocol {
+    func observeLists(householdID: String, onChange: @escaping (Result<[ShoppingCollection], Error>) -> Void) -> ServiceObservation? { nil }
 
     func observeActiveItems(householdID: String, limit: Int, onChange: @escaping (Result<[ShoppingItemModel], Error>) -> Void) -> ServiceObservation? {
         nil

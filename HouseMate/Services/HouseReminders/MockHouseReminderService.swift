@@ -39,6 +39,15 @@ final class MockHouseReminderService: HouseReminderServiceProtocol {
         reminders.append(reminder)
     }
 
+    func updateReminder(_ reminder: HouseReminderModel) async throws {
+        guard let index = reminders.firstIndex(where: {
+            $0.reminderId == reminder.reminderId
+                && $0.householdId == reminder.householdId
+        }) else { return }
+
+        reminders[index] = reminder
+    }
+
     func deleteReminder(reminderID: String, householdID: String) async throws {
         reminders.removeAll {
             $0.reminderId == reminderID && $0.householdId == householdID

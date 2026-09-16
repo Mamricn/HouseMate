@@ -9,6 +9,9 @@ import Foundation
 @MainActor
 final class BillManager {
 
+    private let activeBillsLimit = 40
+    private let paidBillsLimit = 30
+
     private let service: any BillServiceProtocol
     private let notificationService: any LocalNotificationServiceProtocol
     private var activeObservation: ServiceObservation?
@@ -27,19 +30,19 @@ final class BillManager {
         let calendar = Calendar.autoupdatingCurrent
         let today = calendar.startOfDay(for: .now)
 
-        guard let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: today) else {
+        guard let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: today) else {
             return
         }
 
         cancelObservations()
 
-        activeObservation = service.observeActiveBills(householdID: householdID, limit: 40) { [weak self] result in
+        activeObservation = service.observeActiveBills(householdID: householdID, limit: activeBillsLimit) { [weak self] result in
             if case .success(let bills) = result {
                 self?.activeBills = bills
                 self?.mergeObservedBills(today: today)
             }
         }
-        paidObservation = service.observeRecentlyPaidBills(householdID: householdID, paidAfter: thirtyDaysAgo, limit: 20) { [weak self] result in
+        paidObservation = service.observeRecentlyPaidBills(householdID: householdID, paidAfter: oneYearAgo, limit: paidBillsLimit) { [weak self] result in
             if case .success(let bills) = result {
                 self?.paidBills = bills
                 self?.mergeObservedBills(today: today)
@@ -47,8 +50,8 @@ final class BillManager {
         }
 
         if activeObservation == nil || paidObservation == nil {
-            activeBills = try await service.fetchActiveBills(householdID: householdID, limit: 40)
-            paidBills = try await service.fetchRecentlyPaidBills(householdID: householdID, paidAfter: thirtyDaysAgo, limit: 20)
+            activeBills = try await service.fetchActiveBills(householdID: householdID, limit: activeBillsLimit)
+            paidBills = try await service.fetchRecentlyPaidBills(householdID: householdID, paidAfter: oneYearAgo, limit: paidBillsLimit)
             mergeObservedBills(today: today)
         }
     }
@@ -119,8 +122,7 @@ final class BillManager {
             active[index].status = .overdue
         }
 
-        let availablePaidSlots = max(0, 40 - active.count)
-        bills = active + Array(paidBills.prefix(availablePaidSlots))
+        bills = active + paidBills
         sortBills()
         synchronizeNotifications()
     }
@@ -194,14 +196,13 @@ final class BillManager {
     }
 
     private func trimBills() {
-        guard bills.count > 40 else {
+        guard bills.count > activeBillsLimit + paidBillsLimit else {
             return
         }
 
         let activeBills = bills.filter { $0.status != .paid }
         let paidBills = bills.filter { $0.status == .paid }
-        let availablePaidSlots = max(0, 40 - activeBills.count)
-        bills = Array(activeBills.prefix(40)) + Array(paidBills.prefix(availablePaidSlots))
+        bills = Array(activeBills.prefix(activeBillsLimit)) + Array(paidBills.prefix(paidBillsLimit))
     }
 
     private func synchronizeNotifications() {

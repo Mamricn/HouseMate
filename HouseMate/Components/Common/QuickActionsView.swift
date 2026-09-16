@@ -21,27 +21,154 @@ struct QuickActionOption: Identifiable {
 
 struct QuickActionsView: View {
 
+    enum Layout {
+        case list
+        case grid
+        case themedList
+    }
+
     @Environment(\.dismiss) private var dismiss
 
     let title: String
     let subtitle: String
     let options: [QuickActionOption]
+    var layout: Layout = .list
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            header
-
-            VStack(spacing: 10) {
-                ForEach(options) { option in
-                    optionButton(option)
-                }
+        ZStack {
+            if layout != .list {
+                gridBackground
+                    .ignoresSafeArea()
             }
 
-            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 18) {
+                header
 
-            cancelButton
+                if layout == .grid {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 10),
+                            GridItem(.flexible(), spacing: 10)
+                        ],
+                        spacing: 10
+                    ) {
+                        ForEach(options) { option in
+                            gridOptionButton(option)
+                        }
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(options) { option in
+                            optionButton(option, themed: layout == .themedList)
+                        }
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                cancelButton
+            }
+            .padding(20)
+            .padding(.top, layout == .list ? 0 : 12)
         }
-        .padding(20)
+    }
+
+    private var gridBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.89, green: 0.95, blue: 1.00),
+                    Color(red: 0.95, green: 0.89, blue: 0.98),
+                    Color(red: 0.91, green: 0.96, blue: 1.00)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.blue.opacity(0.13))
+                .frame(width: 190, height: 190)
+                .blur(radius: 35)
+                .offset(x: 145, y: -180)
+
+            Circle()
+                .fill(Color.purple.opacity(0.11))
+                .frame(width: 210, height: 210)
+                .blur(radius: 40)
+                .offset(x: -150, y: 190)
+        }
+    }
+
+    private func gridOptionButton(
+        _ option: QuickActionOption
+    ) -> some View {
+        Button {
+            open(option)
+        } label: {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    customGridIcon(option)
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.primary.opacity(0.22))
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(option.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(Color.primary.opacity(0.48))
+                        .lineLimit(1)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(.white.opacity(0.62), lineWidth: 0.8)
+                    }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func customGridIcon(_ option: QuickActionOption) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            option.color.opacity(0.92),
+                            option.color.opacity(0.62)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Circle()
+                .fill(.white.opacity(0.22))
+                .frame(width: 25, height: 25)
+                .offset(x: 13, y: -13)
+                .blur(radius: 1)
+
+            Image(systemName: option.systemImage)
+                .font(.system(size: 17, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.white)
+        }
+        .frame(width: 40, height: 40)
+        .shadow(color: option.color.opacity(0.22), radius: 5, y: 3)
     }
 
     // MARK: - Header
@@ -61,18 +188,23 @@ struct QuickActionsView: View {
     // MARK: - Option
 
     private func optionButton(
-        _ option: QuickActionOption
+        _ option: QuickActionOption,
+        themed: Bool = false
     ) -> some View {
         Button {
             open(option)
         } label: {
             HStack(spacing: 14) {
-                HouseMateSymbolView(
-                    systemName: option.systemImage,
-                    color: option.color,
-                    size: 44,
-                    symbolSize: 19
-                )
+                if themed {
+                    customGridIcon(option)
+                } else {
+                    HouseMateSymbolView(
+                        systemName: option.systemImage,
+                        color: option.color,
+                        size: 44,
+                        symbolSize: 19
+                    )
+                }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(option.title)
@@ -99,7 +231,13 @@ struct QuickActionsView: View {
                     cornerRadius: 18,
                     style: .continuous
                 )
-                .fill(Color(.secondarySystemBackground))
+                .fill(themed ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(.secondarySystemBackground)))
+                .overlay {
+                    if themed {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(.white.opacity(0.62), lineWidth: 0.8)
+                    }
+                }
             }
         }
         .buttonStyle(.plain)

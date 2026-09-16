@@ -406,6 +406,7 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
         let subcollectionNames = [
             "tasks",
             "shopping_items",
+            "shopping_lists",
             "bills",
             "house_reminders",
             "polls",

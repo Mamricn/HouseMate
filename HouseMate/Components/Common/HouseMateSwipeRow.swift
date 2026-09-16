@@ -177,6 +177,9 @@ private struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
 
+        private let horizontalDirectionRatio: CGFloat = 1.35
+        private let minimumHorizontalVelocity: CGFloat = 24
+
         func gestureRecognizerShouldBegin(
             _ gestureRecognizer: UIGestureRecognizer
         ) -> Bool {
@@ -185,14 +188,15 @@ private struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
             }
 
             let velocity = panGesture.velocity(in: panGesture.view)
-            return abs(velocity.x) > abs(velocity.y)
+            return abs(velocity.x) >= minimumHorizontalVelocity
+                && abs(velocity.x) > abs(velocity.y) * horizontalDirectionRatio
         }
 
         func gestureRecognizer(
             _ gestureRecognizer: UIGestureRecognizer,
             shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
         ) -> Bool {
-            true
+            false
         }
     }
 }

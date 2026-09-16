@@ -81,11 +81,16 @@ struct NotificationsView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if viewModel.userNotifications.isEmpty {
-                    emptyState
-                } else {
-                    notificationsList
+            ZStack {
+                notificationBackground
+                    .ignoresSafeArea()
+
+                Group {
+                    if viewModel.userNotifications.isEmpty {
+                        emptyState
+                    } else {
+                        notificationsList
+                    }
                 }
             }
             .navigationTitle("Notifications")
@@ -95,8 +100,35 @@ struct NotificationsView: View {
                 trailingToolbar
             }
         }
+        .presentationBackground(.clear)
         .onAppear {
             referenceDate = .now
+        }
+    }
+
+    private var notificationBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.89, green: 0.95, blue: 1.00),
+                    Color(red: 0.95, green: 0.89, blue: 0.98),
+                    Color(red: 0.91, green: 0.96, blue: 1.00)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.blue.opacity(0.12))
+                .frame(width: 240, height: 240)
+                .blur(radius: 45)
+                .offset(x: 170, y: -260)
+
+            Circle()
+                .fill(Color.purple.opacity(0.10))
+                .frame(width: 240, height: 240)
+                .blur(radius: 45)
+                .offset(x: -170, y: 260)
         }
     }
 
@@ -131,11 +163,11 @@ struct NotificationsView: View {
     ) -> some View {
         Text(title)
             .font(.footnote.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.primary.opacity(0.58))
             .textCase(.uppercase)
             .padding(.horizontal, 12)
 
-        VStack(spacing: 1) {
+        VStack(spacing: 0) {
             ForEach(notifications) { notification in
                 HouseMateSwipeRow(
                     leadingAction: deleteAction(for: notification),
@@ -152,7 +184,16 @@ struct NotificationsView: View {
                 }
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(8)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(.secondarySystemBackground).opacity(0.88))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(.white.opacity(0.62), lineWidth: 0.8)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func deleteAction(for notification: NotificationModel) -> HouseMateSwipeAction {
@@ -211,8 +252,9 @@ struct NotificationsView: View {
         ToolbarItem(
             placement: .cancellationAction
         ) {
-            Button("Done") {
-                dismiss()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.subheadline.weight(.semibold))
             }
         }
     }
@@ -223,11 +265,16 @@ struct NotificationsView: View {
             ToolbarItem(
                 placement: .confirmationAction
             ) {
-                Button("Read All") {
+                Button {
                     Task {
                         _ = await viewModel.markAllAsRead()
                     }
+                } label: {
+                    Text("Read all")
+                        .font(.subheadline.weight(.medium))
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.blue)
             }
         }
     }

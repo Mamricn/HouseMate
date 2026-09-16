@@ -76,6 +76,28 @@ final class HouseReminderManager {
         reminders = Array(reminders.prefix(30))
     }
 
+    func updateReminder(
+        _ reminder: HouseReminderModel,
+        currentUserID: String,
+        ownerUserID: String
+    ) async throws {
+        guard reminder.createdByUserId == currentUserID
+                || currentUserID == ownerUserID else {
+            return
+        }
+
+        try await service.updateReminder(reminder)
+
+        if let index = reminders.firstIndex(where: {
+            $0.reminderId == reminder.reminderId
+        }) {
+            reminders[index] = reminder
+        }
+
+        sortReminders()
+        synchronizeNotifications()
+    }
+
     func deleteReminder(_ reminder: HouseReminderModel, currentUserID: String, ownerUserID: String) async throws {
         guard reminder.createdByUserId == currentUserID
                 || currentUserID == ownerUserID else {

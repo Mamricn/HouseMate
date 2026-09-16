@@ -49,6 +49,21 @@ service cloud.firestore {
       return data.get('household_id', '') == householdId;
     }
 
+    function validShoppingList(data, listId) {
+      return data.keys().hasOnly([
+          'id',
+          'name',
+          'symbol'
+        ])
+        && data.get('id', '') == listId
+        && data.get('name', '') is string
+        && data.get('name', '').size() > 0
+        && data.get('name', '').size() <= 60
+        && data.get('symbol', '') is string
+        && data.get('symbol', '').size() > 0
+        && data.get('symbol', '').size() <= 80;
+    }
+
     // USERS
 
     match /users/{userId} {
@@ -236,6 +251,23 @@ service cloud.firestore {
         allow update, delete: if isHouseholdMember(householdId);
       }
 
+      match /shopping_lists/{listId} {
+        allow read: if isHouseholdMember(householdId);
+
+        allow create: if isHouseholdMember(householdId)
+          && validShoppingList(request.resource.data, listId);
+
+        allow update: if isHouseholdMember(householdId)
+          && resource.data.get('id', '') == listId
+          && validShoppingList(request.resource.data, listId)
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['name', 'symbol']);
+
+        allow delete: if isHouseholdMember(householdId);
+      }
+
       match /bills/{billId} {
         allow read: if isHouseholdMember(householdId);
         allow create: if isHouseholdMember(householdId)
@@ -305,7 +337,38 @@ service cloud.firestore {
             && resource.data.get('created_by_user_id', '')
               == request.auth.uid
           );
-        allow update: if false;
+        allow update: if isHouseholdOwner(householdId)
+          || (
+            isHouseholdMember(householdId)
+            && resource.data.get('created_by_user_id', '')
+              == request.auth.uid
+            && request.resource.data.get('created_by_user_id', '')
+              == request.auth.uid
+            && belongsToHousehold(request.resource.data, householdId)
+          );
+      }
+
+      match /documents/{documentId} {
+        allow read: if isHouseholdMember(householdId);
+        allow create: if isHouseholdMember(householdId)
+          && belongsToHousehold(request.resource.data, householdId)
+          && request.resource.data.get('created_by_user_id', '')
+            == request.auth.uid;
+        allow update: if isHouseholdOwner(householdId)
+          || (
+            isHouseholdMember(householdId)
+            && resource.data.get('created_by_user_id', '')
+              == request.auth.uid
+            && request.resource.data.get('created_by_user_id', '')
+              == resource.data.get('created_by_user_id', '')
+            && belongsToHousehold(request.resource.data, householdId)
+          );
+        allow delete: if isHouseholdOwner(householdId)
+          || (
+            isHouseholdMember(householdId)
+            && resource.data.get('created_by_user_id', '')
+              == request.auth.uid
+          );
       }
     }
 
