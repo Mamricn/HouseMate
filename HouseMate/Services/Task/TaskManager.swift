@@ -20,6 +20,7 @@ final class TaskManager {
     private var nextCursor: TaskPageCursor?
     private var firstPageTasks: [TaskModel] = []
     private var additionalTasks: [TaskModel] = []
+    private var isShowingCachedTasks = false
 
     private(set) var tasks: [TaskModel] = []
     private(set) var canLoadMore = false
@@ -49,6 +50,11 @@ final class TaskManager {
 
         currentStartDate = startDate
         currentEndDate = endDate
+        restoreCache(
+            householdID: householdID,
+            startDate: startDate,
+            endDate: endDate
+        )
 
         if let observation = service.observeTasks(householdID: householdID, from: startDate, to: endDate, limit: pageSize, onChange: { [weak self] result in
             switch result {
@@ -71,6 +77,7 @@ final class TaskManager {
             nextCursor = page.nextCursor
             canLoadMore = page.tasks.count == pageSize && page.nextCursor != nil
             mergePages()
+            saveCache()
             synchronizeNotifications()
         }
     }
@@ -98,6 +105,7 @@ final class TaskManager {
         nextCursor = page.nextCursor
         canLoadMore = page.tasks.count == pageSize && page.nextCursor != nil
         mergePages()
+        saveCache()
         synchronizeNotifications()
     }
 
@@ -110,6 +118,7 @@ final class TaskManager {
             firstPageTasks.append(task)
         }
         sortTasks()
+        saveCache()
 
         synchronizeNotifications()
     }
@@ -129,6 +138,7 @@ final class TaskManager {
 
         tasks[index].status = newStatus
         updateCachedTask(tasks[index])
+        saveCache()
 
         if newStatus == .completed {
             notificationService.cancelTask(taskID: task.taskId)
@@ -146,6 +156,7 @@ final class TaskManager {
         tasks.removeAll { $0.taskId == task.taskId }
         firstPageTasks.removeAll { $0.id == task.id }
         additionalTasks.removeAll { $0.id == task.id }
+        saveCache()
         notificationService.cancelTask(taskID: task.taskId)
     }
 
@@ -161,6 +172,7 @@ final class TaskManager {
         additionalTasks = []
         canLoadMore = false
         isLoadingMore = false
+        isShowingCachedTasks = false
         for task in tasks { notificationService.cancelTask(taskID: task.taskId) }
         tasks = []
     }
@@ -174,12 +186,17 @@ final class TaskManager {
     }
 
     private func applyFirstPage(_ fetchedTasks: [TaskModel]) {
+        if isShowingCachedTasks {
+            additionalTasks = []
+            isShowingCachedTasks = false
+        }
         firstPageTasks = fetchedTasks
         nextCursor = fetchedTasks.last.flatMap { task in
             task.dueDate.map { TaskPageCursor(dueDate: $0, documentID: task.id) }
         }
         canLoadMore = fetchedTasks.count == pageSize
         mergePages()
+        saveCache()
         synchronizeNotifications()
     }
 
@@ -202,6 +219,36 @@ final class TaskManager {
         if let index = additionalTasks.firstIndex(where: { $0.id == task.id }) {
             additionalTasks[index] = task
         }
+    }
+
+    private func restoreCache(
+        householdID: String,
+        startDate: Date,
+        endDate: Date
+    ) {
+        guard let cached: [TaskModel] = HomeDataCache.load(
+            feature: .tasks,
+            householdID: householdID
+        ) else { return }
+
+        let relevant = cached.filter { task in
+            guard let dueDate = task.dueDate else { return false }
+            return dueDate >= startDate && dueDate < endDate
+        }
+
+        firstPageTasks = Array(relevant.prefix(pageSize))
+        additionalTasks = Array(relevant.dropFirst(pageSize))
+        isShowingCachedTasks = !relevant.isEmpty
+        mergePages()
+    }
+
+    private func saveCache() {
+        guard let currentHouseholdID else { return }
+        HomeDataCache.save(
+            tasks,
+            feature: .tasks,
+            householdID: currentHouseholdID
+        )
     }
 
     private func synchronizeNotifications() {

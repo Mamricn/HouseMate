@@ -16,6 +16,7 @@ final class BillManager {
     private let notificationService: any LocalNotificationServiceProtocol
     private var activeObservation: ServiceObservation?
     private var paidObservation: ServiceObservation?
+    private var currentHouseholdID: String?
     private var activeBills: [BillModel] = []
     private var paidBills: [BillModel] = []
 
@@ -27,6 +28,8 @@ final class BillManager {
     }
 
     func fetchBills(householdID: String) async throws {
+        currentHouseholdID = householdID
+        restoreCache(householdID: householdID)
         let calendar = Calendar.autoupdatingCurrent
         let today = calendar.startOfDay(for: .now)
 
@@ -63,6 +66,7 @@ final class BillManager {
         }
         sortBills()
         trimBills()
+        saveCache()
 
         synchronizeNotifications()
     }
@@ -93,6 +97,7 @@ final class BillManager {
 
         sortBills()
         trimBills()
+        saveCache()
         notificationService.cancelBill(billID: bill.billId)
         synchronizeNotifications()
     }
@@ -100,6 +105,7 @@ final class BillManager {
     func deleteBill(_ bill: BillModel) async throws {
         try await service.deleteBill(billID: bill.billId, householdID: bill.householdId)
         bills.removeAll { $0.billId == bill.billId }
+        saveCache()
         notificationService.cancelBill(billID: bill.billId)
     }
 
@@ -109,6 +115,7 @@ final class BillManager {
         paidBills = []
         for bill in bills { notificationService.cancelBill(billID: bill.billId) }
         bills = []
+        currentHouseholdID = nil
     }
 
     func refreshNotifications() {
@@ -124,6 +131,7 @@ final class BillManager {
 
         bills = active + paidBills
         sortBills()
+        saveCache()
         synchronizeNotifications()
     }
 
@@ -203,6 +211,27 @@ final class BillManager {
         let activeBills = bills.filter { $0.status != .paid }
         let paidBills = bills.filter { $0.status == .paid }
         bills = Array(activeBills.prefix(activeBillsLimit)) + Array(paidBills.prefix(paidBillsLimit))
+    }
+
+    private func restoreCache(householdID: String) {
+        guard let cached: [BillModel] = HomeDataCache.load(
+            feature: .bills,
+            householdID: householdID
+        ) else { return }
+
+        bills = cached
+        activeBills = cached.filter { $0.status != .paid }
+        paidBills = cached.filter { $0.status == .paid }
+        sortBills()
+    }
+
+    private func saveCache() {
+        guard let currentHouseholdID else { return }
+        HomeDataCache.save(
+            bills,
+            feature: .bills,
+            householdID: currentHouseholdID
+        )
     }
 
     private func synchronizeNotifications() {

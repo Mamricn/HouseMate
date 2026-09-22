@@ -12,13 +12,14 @@ notes can remain in `FEATURES.md`.
 - [x] Protection against duplicate local items from realtime listeners
 - [x] Realtime household-member synchronisation
 - [x] Atomic Firebase household membership updates
+- [x] Show cached Home and Calendar data immediately and refresh it from Firebase in the background
 
 ## 1. Navigation and application structure
 
 - [x] Add a central app router and typed routes
 - [ ] Split routes into household, account and notification areas
 - [x] Add central destination mapping for new screens
-- [ ] Reset navigation after logout, account deletion or leaving a household
+- [x] Reset navigation after logout, account deletion or leaving a household
 - [x] Support opening a specific screen from a notification
 - [ ] Migrate existing navigation gradually without rewriting every screen at once
 
@@ -76,23 +77,23 @@ notes can remain in `FEATURES.md`.
 - [x] Require recent authentication for sensitive operations
 - [x] Handle account deletion when the user owns a household
 - [ ] Remove or anonymise user references in retained history where appropriate
-- [ ] Delete the user profile, device tokens and avatar (profile and avatar done; tokens follow with advanced notifications)
+- [x] Delete the user profile, device tokens and avatar
 - [x] Delete the Firebase Authentication account only after data cleanup succeeds
 - [ ] Add a clear recovery path if account deletion fails partway through
 
 ## 6. Advanced notifications
 
-- [ ] Configure APNs and Firebase Cloud Messaging
+- [x] Configure APNs and Firebase Cloud Messaging in the app
 - [x] Store, refresh and remove device registrations per signed-in device
 - [ ] Add server-triggered notifications for activity created by another member
 - [ ] Notify users about assigned tasks
 - [ ] Notify users about upcoming bills and reminders
 - [ ] Decide whether new polls and important board posts should notify members
-- [ ] Add per-category notification preferences
-- [ ] Respect system notification permission status
-- [ ] Handle notifications while the app is open
+- [x] Add per-category notification preferences
+- [x] Respect system notification permission status
+- [x] Handle notifications while the app is open
 - [x] Add deep linking to the relevant screen (opening a specific item remains follow-up work)
-- [ ] Cancel or reschedule notifications when source data changes
+- [x] Cancel or reschedule local notifications when source data changes
 - [ ] Avoid duplicate local and remote notifications
 
 See `FEATURES.md` for the detailed notification policy.
@@ -105,10 +106,10 @@ See `FEATURES.md` for the detailed notification policy.
 - [ ] Add reminder details with notes, next date, time, recurrence and notification timing
 - [ ] Allow reminders to be edited, deleted and completed from their details
 - [ ] Open a bill from its row and show its complete details
-- [ ] Record `paidAt` when a bill is marked as paid
-- [ ] Add a dedicated Bills screen with week, month, six-month and year filters
+- [x] Record `paidAt` when a bill is marked as paid
+- [x] Add a dedicated Bills screen with week, month, six-month and year filters
 - [ ] Add bill totals, category breakdown, previous-period comparison and recurring-cost summary
-- [ ] Add clear charts only where they make spending easier to understand
+- [x] Add clear charts only where they make spending easier to understand
 - [ ] Consider budgets, receipt photos, search and CSV export after the core dashboard
 
 - [ ] Review every form for consistent validation behaviour
@@ -141,11 +142,11 @@ See `FEATURES.md` for the detailed notification policy.
 
 - [ ] Finalise Firestore Security Rules after roles and ownership are stable
 - [x] Add Firebase Storage Rules for profile images
-- [ ] Add Firebase App Check
+- [x] Add Firebase App Check for Development and Production
 - [ ] Validate privileged operations on the backend
 - [ ] Add and document required Firestore indexes
 - [ ] Review query cost and unnecessary document reads
-- [ ] Separate Development and Production Firebase configuration
+- [x] Separate Development and Production Firebase configuration
 - [ ] Test rules using the Firebase Emulator Suite
 - [ ] Plan schema migrations for future model changes
 

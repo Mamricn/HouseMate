@@ -13,12 +13,14 @@ final class ShoppingManager {
     private var activeObservation: ServiceObservation?
     private var purchasedObservation: ServiceObservation?
     private var listsObservation: ServiceObservation?
+    private var currentHouseholdID: String?
     private(set) var lists: [ShoppingCollection] = [.groceries]
 
     func saveList(_ list: ShoppingCollection, householdID: String) async throws {
         try await service.saveList(list, householdID: householdID)
         lists.removeAll { $0.id == list.id }
         lists.append(list)
+        saveCache()
     }
 
     func moveItem(_ item: ShoppingItemModel, to listID: String) async throws {
@@ -26,6 +28,7 @@ final class ShoppingManager {
         updated.listId = listID
         try await service.moveItem(item, to: listID)
         if let index = items.firstIndex(where: { $0.id == item.id }) { items[index] = updated }
+        saveCache()
     }
     private var activeItems: [ShoppingItemModel] = []
     private var purchasedItems: [ShoppingItemModel] = []
@@ -37,6 +40,8 @@ final class ShoppingManager {
     }
 
     func fetchItems(householdID: String) async throws {
+        currentHouseholdID = householdID
+        restoreCache(householdID: householdID)
         let calendar = Calendar.autoupdatingCurrent
         let today = calendar.startOfDay(for: .now)
 
@@ -81,6 +86,7 @@ final class ShoppingManager {
         }
         sortItems()
         trimItems()
+        saveCache()
     }
 
     func togglePurchased(_ item: ShoppingItemModel) async throws {
@@ -101,11 +107,13 @@ final class ShoppingManager {
         items[index].isPurchased = isPurchased
         items[index].purchasedAt = purchasedAt
         sortItems()
+        saveCache()
     }
 
     func deleteItem(_ item: ShoppingItemModel) async throws {
         try await service.deleteItem(itemID: item.itemId, householdID: item.householdId)
         items.removeAll { $0.itemId == item.itemId }
+        saveCache()
     }
 
     func clearPurchasedItems(listID: String? = nil) async throws {
@@ -113,6 +121,7 @@ final class ShoppingManager {
         try await service.deleteItems(purchasedItems)
         let ids = Set(purchasedItems.map(\.id))
         items.removeAll { ids.contains($0.id) }
+        saveCache()
     }
 
     func clearItems() {
@@ -121,12 +130,14 @@ final class ShoppingManager {
         purchasedItems = []
         items = []
         lists = [.groceries]
+        currentHouseholdID = nil
     }
 
     private func mergeObservedItems() {
         let availablePurchasedSlots = max(0, 40 - activeItems.count)
         items = activeItems + Array(purchasedItems.prefix(availablePurchasedSlots))
         sortItems()
+        saveCache()
     }
 
     private func cancelObservations() {
@@ -141,6 +152,39 @@ final class ShoppingManager {
     private func mergeLists(_ saved: [ShoppingCollection]) {
         lists = [.groceries] + saved.filter { $0.id != "groceries" }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         if let groceries = saved.first(where: { $0.id == "groceries" }) { lists[0] = groceries }
+        saveCache()
+    }
+
+    private func restoreCache(householdID: String) {
+        if let cachedItems: [ShoppingItemModel] = HomeDataCache.load(
+            feature: .shoppingItems,
+            householdID: householdID
+        ) {
+            items = cachedItems
+            activeItems = cachedItems.filter { !$0.isPurchased }
+            purchasedItems = cachedItems.filter(\.isPurchased)
+        }
+
+        if let cachedLists: [ShoppingCollection] = HomeDataCache.load(
+            feature: .shoppingLists,
+            householdID: householdID
+        ) {
+            lists = cachedLists
+        }
+    }
+
+    private func saveCache() {
+        guard let currentHouseholdID else { return }
+        HomeDataCache.save(
+            items,
+            feature: .shoppingItems,
+            householdID: currentHouseholdID
+        )
+        HomeDataCache.save(
+            lists,
+            feature: .shoppingLists,
+            householdID: currentHouseholdID
+        )
     }
 
     private func sortItems() {

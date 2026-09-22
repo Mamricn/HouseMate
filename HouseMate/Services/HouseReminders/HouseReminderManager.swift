@@ -13,6 +13,7 @@ final class HouseReminderManager {
     private let notificationService: any LocalNotificationServiceProtocol
     private var recurringObservation: ServiceObservation?
     private var futureObservation: ServiceObservation?
+    private var currentHouseholdID: String?
     private var recurringReminders: [HouseReminderModel] = []
     private var futureReminders: [HouseReminderModel] = []
 
@@ -24,6 +25,8 @@ final class HouseReminderManager {
     }
 
     func fetchReminders(householdID: String) async throws {
+        currentHouseholdID = householdID
+        restoreCache(householdID: householdID)
         let now = Date.now
         cancelObservations()
         recurringObservation = service.observeRecurringReminders(householdID: householdID, limit: 30) { [weak self] result in
@@ -65,6 +68,7 @@ final class HouseReminderManager {
             .map { $0 }
 
         synchronizeNotifications()
+        saveCache()
     }
 
     func createReminder(_ reminder: HouseReminderModel) async throws {
@@ -74,6 +78,7 @@ final class HouseReminderManager {
         }
         sortReminders()
         reminders = Array(reminders.prefix(30))
+        saveCache()
     }
 
     func updateReminder(
@@ -95,6 +100,7 @@ final class HouseReminderManager {
         }
 
         sortReminders()
+        saveCache()
         synchronizeNotifications()
     }
 
@@ -110,6 +116,7 @@ final class HouseReminderManager {
         )
 
         reminders.removeAll { $0.reminderId == reminder.reminderId }
+        saveCache()
         notificationService.cancelHouseReminder(reminderID: reminder.reminderId)
     }
 
@@ -123,6 +130,7 @@ final class HouseReminderManager {
         recurringReminders = []
         futureReminders = []
         reminders = []
+        currentHouseholdID = nil
     }
 
     func refreshNotifications() {
@@ -143,6 +151,27 @@ final class HouseReminderManager {
             ($0.nextOccurrence(after: now) ?? .distantFuture)
                 < ($1.nextOccurrence(after: now) ?? .distantFuture)
         }
+    }
+
+    private func restoreCache(householdID: String) {
+        guard let cached: [HouseReminderModel] = HomeDataCache.load(
+            feature: .reminders,
+            householdID: householdID
+        ) else { return }
+
+        reminders = cached
+        recurringReminders = cached.filter { $0.recurrence != .never }
+        futureReminders = cached.filter { $0.recurrence == .never }
+        sortReminders()
+    }
+
+    private func saveCache() {
+        guard let currentHouseholdID else { return }
+        HomeDataCache.save(
+            reminders,
+            feature: .reminders,
+            householdID: currentHouseholdID
+        )
     }
 
     private func synchronizeNotifications() {
