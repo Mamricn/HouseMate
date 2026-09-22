@@ -4,34 +4,42 @@ struct HouseholdCalendarView: View {
     let tasks: [TaskModel]
     let bills: [BillModel]
     let reminders: [HouseReminderModel]
+    let canLoadMoreTasks: Bool
     var onOpenTasks: () -> Void = {}
     var onOpenBills: () -> Void = {}
     var onOpenReminders: () -> Void = {}
+    var onEnsureTaskCount: @MainActor (Date, Int) async -> Void = { _, _ in }
     var onRefresh: @MainActor () async -> Void = {}
 
     @Binding private var selectedDate: Date
     @State private var displayedMonth: Date
     @State private var isHeaderElevated = false
+    @State private var displayedEventLimit = 10
 
     private let calendar = Calendar.autoupdatingCurrent
     private let weekdaySymbols = Calendar.current.veryShortStandaloneWeekdaySymbols
+    private let eventPageSize = 10
 
     init(
         tasks: [TaskModel],
         bills: [BillModel],
         reminders: [HouseReminderModel],
+        canLoadMoreTasks: Bool = false,
         selectedDate: Binding<Date>,
         onOpenTasks: @escaping () -> Void = {},
         onOpenBills: @escaping () -> Void = {},
         onOpenReminders: @escaping () -> Void = {},
+        onEnsureTaskCount: @escaping @MainActor (Date, Int) async -> Void = { _, _ in },
         onRefresh: @escaping @MainActor () async -> Void = {}
     ) {
         self.tasks = tasks
         self.bills = bills
         self.reminders = reminders
+        self.canLoadMoreTasks = canLoadMoreTasks
         self.onOpenTasks = onOpenTasks
         self.onOpenBills = onOpenBills
         self.onOpenReminders = onOpenReminders
+        self.onEnsureTaskCount = onEnsureTaskCount
         self.onRefresh = onRefresh
         _selectedDate = selectedDate
         _displayedMonth = State(initialValue: Calendar.current.startOfMonth(for: selectedDate.wrappedValue))
@@ -67,13 +75,21 @@ struct HouseholdCalendarView: View {
                     .padding(.top, 18)
                     .padding(.bottom, 105)
                 }
-                .houseMatePullToRefresh(action: onRefresh)
+                .houseMatePullToRefresh {
+                    await onRefresh()
+                }
                 .onScrollGeometryChange(for: Bool.self) { geometry in
                     geometry.contentOffset.y + geometry.contentInsets.top > 4
                 } action: { _, isScrolled in
                     isHeaderElevated = isScrolled
                 }
             }
+        }
+        .onChange(of: selectedDate) { _, _ in
+            displayedEventLimit = eventPageSize
+        }
+        .task(id: taskLoadRequest) {
+            await onEnsureTaskCount(selectedDate, displayedEventLimit)
         }
     }
 
@@ -118,7 +134,9 @@ struct HouseholdCalendarView: View {
     private var calendarCard: some View {
         VStack(spacing: 16) {
             HStack {
-                Button { changeMonth(by: -1) } label: {
+                Button {
+                    changeMonth(by: -1)
+                } label: {
                     Image(systemName: "chevron.left")
                 }
 
@@ -129,7 +147,9 @@ struct HouseholdCalendarView: View {
 
                 Spacer()
 
-                Button { changeMonth(by: 1) } label: {
+                Button {
+                    changeMonth(by: 1)
+                } label: {
                     Image(systemName: "chevron.right")
                 }
             }
@@ -227,17 +247,24 @@ struct HouseholdCalendarView: View {
                 .frame(maxWidth: .infinity, minHeight: 180)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(selectedEvents.enumerated()), id: \.element.id) { index, event in
-                        Button { open(event.kind) } label: {
+                    ForEach(Array(visibleSelectedEvents.enumerated()), id: \.element.id) { index, event in
+                        Button {
+                            open(event.kind)
+                        } label: {
                             agendaRow(event)
                         }
                         .buttonStyle(.plain)
 
-                        if index < selectedEvents.count - 1 {
+                        if index < visibleSelectedEvents.count - 1 {
                             Divider().padding(.leading, 58)
                         }
                     }
+
+                    if selectedEvents.count > eventPageSize || canLoadMoreTasks {
+                        agendaPaginationControls
+                    }
                 }
+                .animation(.snappy(duration: 0.3), value: displayedEventLimit)
             }
         }
         .padding(20)
@@ -287,6 +314,52 @@ struct HouseholdCalendarView: View {
         events(on: selectedDate).sorted { $0.date < $1.date }
     }
 
+    private var visibleSelectedEvents: [CalendarEvent] {
+        Array(selectedEvents.prefix(displayedEventLimit))
+    }
+
+    private var agendaPaginationControls: some View {
+        HStack(spacing: 12) {
+            if displayedEventLimit < selectedEvents.count || canLoadMoreTasks {
+                Button {
+                    let requestedLimit = displayedEventLimit + eventPageSize
+
+                    Task {
+                        await onEnsureTaskCount(selectedDate, requestedLimit)
+
+                        withAnimation(.snappy(duration: 0.3)) {
+                            displayedEventLimit = min(
+                                requestedLimit,
+                                selectedEvents.count
+                            )
+                        }
+                    }
+                } label: {
+                    Label("Load more", systemImage: "chevron.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .accessibilityLabel("Load more calendar events")
+            }
+
+            if displayedEventLimit > eventPageSize {
+                Button {
+                    withAnimation(.snappy(duration: 0.3)) {
+                        displayedEventLimit = eventPageSize
+                    }
+                } label: {
+                    Label("Show less", systemImage: "chevron.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .accessibilityLabel("Show fewer calendar events")
+            }
+        }
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.blue)
+        .buttonStyle(.plain)
+        .padding(.top, 14)
+        .padding(.bottom, 2)
+    }
+
     private func events(on date: Date) -> [CalendarEvent] {
         let dayStart = calendar.startOfDay(for: date)
         let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
@@ -325,6 +398,14 @@ struct HouseholdCalendarView: View {
         }
 
         return result
+    }
+
+    private var taskLoadRequest: TaskLoadRequest {
+        TaskLoadRequest(
+            day: calendar.startOfDay(for: selectedDate),
+            loadedTaskCount: tasks.count,
+            requestedCount: displayedEventLimit
+        )
     }
 
     private func eventColors(on date: Date) -> [Color] {
@@ -372,9 +453,23 @@ struct HouseholdCalendarView: View {
     }
 }
 
+private struct TaskLoadRequest: Hashable {
+    let day: Date
+    let loadedTaskCount: Int
+    let requestedCount: Int
+}
+
 private struct CalendarEvent: Identifiable {
     enum Kind: Hashable {
         case task, bill, reminder
+
+        var analyticsName: String {
+            switch self {
+            case .task: "tasks"
+            case .bill: "bills"
+            case .reminder: "reminders"
+            }
+        }
 
         var systemImage: String {
             switch self {

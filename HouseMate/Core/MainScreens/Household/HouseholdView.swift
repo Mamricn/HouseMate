@@ -22,9 +22,15 @@ final class HouseholdViewModel {
 
     let householdOwnerUserID: String
 
+    private var didLoadPolls = false
+    private var didLoadDocuments = false
+
     var tasks: [TaskModel] {
         interactor.tasks
     }
+
+    var canLoadMoreTasks: Bool { interactor.canLoadMoreTasks }
+    var isLoadingMoreTasks: Bool { interactor.isLoadingMoreTasks }
 
     var shoppingItems: [ShoppingItemModel] {
         interactor.shoppingItems
@@ -33,10 +39,20 @@ final class HouseholdViewModel {
     var selectedShoppingListID = "groceries"
     func saveShoppingList(_ list: ShoppingCollection) async -> Bool {
         guard let id = currentUser.householdId else { return false }
-        return await actionState.perform { try await interactor.saveShoppingList(list, householdID: id) }
+        let parameters = list.eventParameters
+        interactor.trackEvent(Event.start(operation: .saveShoppingList, parameters: parameters))
+        do {
+            try await actionState.run { try await interactor.saveShoppingList(list, householdID: id) }
+            interactor.trackEvent(Event.success(operation: .saveShoppingList, parameters: parameters)); return true
+        } catch { interactor.trackEvent(Event.fail(operation: .saveShoppingList, error: error, parameters: parameters)); return false }
     }
     func moveShoppingItem(_ item: ShoppingItemModel, to listID: String) async -> Bool {
-        await actionState.perform { try await interactor.moveShoppingItem(item, to: listID) }
+        let parameters = item.eventParameters.merging(["target_list_id": listID]) { current, _ in current }
+        interactor.trackEvent(Event.start(operation: .moveShoppingItem, parameters: parameters))
+        do {
+            try await actionState.run { try await interactor.moveShoppingItem(item, to: listID) }
+            interactor.trackEvent(Event.success(operation: .moveShoppingItem, parameters: parameters)); return true
+        } catch { interactor.trackEvent(Event.fail(operation: .moveShoppingItem, error: error, parameters: parameters)); return false }
     }
 
     var bills: [BillModel] {
@@ -105,21 +121,26 @@ final class HouseholdViewModel {
             participatesInWeeklyRotation: participatesInWeeklyRotation
         )
 
-        return await actionState.perform {
-            try await interactor.createTask(newTask)
-        }
+        let parameters = newTask.eventParameters
+        interactor.trackEvent(Event.start(operation: .addChore, parameters: parameters))
+        do {
+            try await actionState.run { try await interactor.createTask(newTask) }
+            interactor.trackEvent(Event.success(operation: .addChore, parameters: parameters)); return true
+        } catch { interactor.trackEvent(Event.fail(operation: .addChore, error: error, parameters: parameters)); return false }
     }
 
     func toggleTaskStatus(_ task: TaskModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.toggleTaskStatus(task)
-        }
+        let parameters = task.eventParameters
+        interactor.trackEvent(Event.start(operation: .toggleTaskStatus, parameters: parameters))
+        do { try await actionState.run { try await interactor.toggleTaskStatus(task) }; interactor.trackEvent(Event.success(operation: .toggleTaskStatus, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .toggleTaskStatus, error: error, parameters: parameters)); return false }
     }
 
     func deleteTask(_ task: TaskModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.deleteTask(task)
-        }
+        let parameters = task.eventParameters
+        interactor.trackEvent(Event.start(operation: .deleteTask, parameters: parameters))
+        do { try await actionState.run { try await interactor.deleteTask(task) }; interactor.trackEvent(Event.success(operation: .deleteTask, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .deleteTask, error: error, parameters: parameters)); return false }
     }
 
     func fetchTasks() async {
@@ -127,8 +148,30 @@ final class HouseholdViewModel {
             return
         }
 
-        await actionState.capture {
-            try await interactor.fetchTasks(householdID: householdID, currentUserID: currentUser.id)
+        interactor.trackEvent(Event.start(operation: .fetchTasks, parameters: nil))
+        do { try await actionState.run { try await interactor.fetchTasks(householdID: householdID, currentUserID: currentUser.id) }; interactor.trackEvent(Event.success(operation: .fetchTasks, parameters: nil)) }
+        catch { interactor.trackEvent(Event.fail(operation: .fetchTasks, error: error, parameters: nil)) }
+    }
+
+    func loadMoreTasks() async {
+        interactor.trackEvent(Event.start(operation: .loadMoreTasks, parameters: nil))
+        do { try await actionState.run { try await interactor.loadMoreTasks() }; interactor.trackEvent(Event.success(operation: .loadMoreTasks, parameters: nil)) }
+        catch { interactor.trackEvent(Event.fail(operation: .loadMoreTasks, error: error, parameters: nil)) }
+    }
+
+    func ensureTasksLoaded(for date: Date, minimumCount: Int) async {
+        let calendar = Calendar.autoupdatingCurrent
+        var previousTaskCount = -1
+
+        while tasks.filter({ task in
+            task.dueDate.map {
+                calendar.isDate($0, inSameDayAs: date)
+            } == true
+        }).count < minimumCount,
+        canLoadMoreTasks,
+        tasks.count != previousTaskCount {
+            previousTaskCount = tasks.count
+            await loadMoreTasks()
         }
     }
 
@@ -154,31 +197,35 @@ final class HouseholdViewModel {
             listId: listID ?? selectedShoppingListID
         )
 
-        return await actionState.perform {
-            try await interactor.createShoppingItem(newItem)
-        }
+        let parameters = newItem.eventParameters
+        interactor.trackEvent(Event.start(operation: .addShoppingItem, parameters: parameters))
+        do { try await actionState.run { try await interactor.createShoppingItem(newItem) }; interactor.trackEvent(Event.success(operation: .addShoppingItem, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .addShoppingItem, error: error, parameters: parameters)); return false }
     }
 
     func toggleShoppingItem(
         _ item: ShoppingItemModel
     ) async -> Bool {
-        await actionState.perform {
-            try await interactor.toggleShoppingItemPurchased(item)
-        }
+        let parameters = item.eventParameters
+        interactor.trackEvent(Event.start(operation: .toggleShoppingItem, parameters: parameters))
+        do { try await actionState.run { try await interactor.toggleShoppingItemPurchased(item) }; interactor.trackEvent(Event.success(operation: .toggleShoppingItem, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .toggleShoppingItem, error: error, parameters: parameters)); return false }
     }
 
     func deleteShoppingItem(
         _ item: ShoppingItemModel
     ) async -> Bool {
-        await actionState.perform {
-            try await interactor.deleteShoppingItem(item)
-        }
+        let parameters = item.eventParameters
+        interactor.trackEvent(Event.start(operation: .deleteShoppingItem, parameters: parameters))
+        do { try await actionState.run { try await interactor.deleteShoppingItem(item) }; interactor.trackEvent(Event.success(operation: .deleteShoppingItem, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .deleteShoppingItem, error: error, parameters: parameters)); return false }
     }
 
     func clearPurchasedShoppingItems(listID: String? = nil) async -> Bool {
-        await actionState.perform {
-            try await interactor.clearPurchasedShoppingItems(listID: listID)
-        }
+        let parameters = listID.map { ["shopping_list_id": $0] }
+        interactor.trackEvent(Event.start(operation: .clearPurchasedShoppingItems, parameters: parameters))
+        do { try await actionState.run { try await interactor.clearPurchasedShoppingItems(listID: listID) }; interactor.trackEvent(Event.success(operation: .clearPurchasedShoppingItems, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .clearPurchasedShoppingItems, error: error, parameters: parameters)); return false }
     }
 
     func fetchShoppingItems() async {
@@ -186,9 +233,9 @@ final class HouseholdViewModel {
             return
         }
 
-        await actionState.capture {
-            try await interactor.fetchShoppingItems(householdID: householdID)
-        }
+        interactor.trackEvent(Event.start(operation: .fetchShoppingItems, parameters: nil))
+        do { try await actionState.run { try await interactor.fetchShoppingItems(householdID: householdID) }; interactor.trackEvent(Event.success(operation: .fetchShoppingItems, parameters: nil)) }
+        catch { interactor.trackEvent(Event.fail(operation: .fetchShoppingItems, error: error, parameters: nil)) }
     }
 
     // MARK: - Bill Actions
@@ -225,21 +272,37 @@ final class HouseholdViewModel {
             notificationAdvance: notificationAdvance == .none ? nil : notificationAdvance
         )
 
-        return await actionState.perform {
-            try await interactor.createBill(newBill)
+        interactor.trackEvent(Event.addBillStart(bill: newBill))
+
+        do {
+            try await actionState.run {
+                try await interactor.createBill(newBill)
+            }
+            interactor.trackEvent(Event.addBillSuccess(bill: newBill))
+            return true
+        } catch {
+            interactor.trackEvent(
+                Event.addBillFail(
+                    error: error,
+                    bill: newBill
+                )
+            )
+            return false
         }
     }
 
     func markBillAsPaid(_ bill: BillModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.markBillAsPaid(bill, paidByUserID: currentUser.id)
-        }
+        let parameters = bill.eventParameters
+        interactor.trackEvent(Event.start(operation: .markBillAsPaid, parameters: parameters))
+        do { try await actionState.run { try await interactor.markBillAsPaid(bill, paidByUserID: currentUser.id) }; interactor.trackEvent(Event.success(operation: .markBillAsPaid, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .markBillAsPaid, error: error, parameters: parameters)); return false }
     }
 
     func deleteBill(_ bill: BillModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.deleteBill(bill)
-        }
+        let parameters = bill.eventParameters
+        interactor.trackEvent(Event.start(operation: .deleteBill, parameters: parameters))
+        do { try await actionState.run { try await interactor.deleteBill(bill) }; interactor.trackEvent(Event.success(operation: .deleteBill, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .deleteBill, error: error, parameters: parameters)); return false }
     }
 
     func fetchBills() async {
@@ -247,9 +310,9 @@ final class HouseholdViewModel {
             return
         }
 
-        await actionState.capture {
-            try await interactor.fetchBills(householdID: householdID)
-        }
+        interactor.trackEvent(Event.start(operation: .fetchBills, parameters: nil))
+        do { try await actionState.run { try await interactor.fetchBills(householdID: householdID) }; interactor.trackEvent(Event.success(operation: .fetchBills, parameters: nil)) }
+        catch { interactor.trackEvent(Event.fail(operation: .fetchBills, error: error, parameters: nil)) }
     }
 
     // MARK: - Poll Actions
@@ -269,33 +332,46 @@ final class HouseholdViewModel {
             expiresAt: expiresAt
         )
 
-        return await actionState.perform {
-            try await interactor.createPoll(poll)
-        }
+        let parameters = poll.eventParameters
+        interactor.trackEvent(Event.start(operation: .addPoll, parameters: parameters))
+        do { try await actionState.run { try await interactor.createPoll(poll) }; interactor.trackEvent(Event.success(operation: .addPoll, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .addPoll, error: error, parameters: parameters)); return false }
     }
 
     func vote(in poll: PollModel, for option: PollOptionModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.vote(in: poll, option: option, userID: currentUser.id)
-        }
+        let parameters = poll.eventParameters.merging(option.eventParameters) { current, _ in current }
+        interactor.trackEvent(Event.start(operation: .vote, parameters: parameters))
+        do { try await actionState.run { try await interactor.vote(in: poll, option: option, userID: currentUser.id) }; interactor.trackEvent(Event.success(operation: .vote, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .vote, error: error, parameters: parameters)); return false }
     }
 
     func removeVote(in poll: PollModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.removeVote(in: poll, userID: currentUser.id)
-        }
+        let parameters = poll.eventParameters
+        interactor.trackEvent(Event.start(operation: .removeVote, parameters: parameters))
+        do { try await actionState.run { try await interactor.removeVote(in: poll, userID: currentUser.id) }; interactor.trackEvent(Event.success(operation: .removeVote, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .removeVote, error: error, parameters: parameters)); return false }
     }
 
     func closePoll(_ poll: PollModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.closePoll(poll, currentUserID: currentUser.id)
-        }
+        let parameters = poll.eventParameters
+        interactor.trackEvent(Event.start(operation: .closePoll, parameters: parameters))
+        do { try await actionState.run { try await interactor.closePoll(poll, currentUserID: currentUser.id) }; interactor.trackEvent(Event.success(operation: .closePoll, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .closePoll, error: error, parameters: parameters)); return false }
     }
 
     func deletePoll(_ poll: PollModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.deletePoll(poll, currentUserID: currentUser.id)
-        }
+        let parameters = poll.eventParameters
+        interactor.trackEvent(Event.start(operation: .deletePoll, parameters: parameters))
+        do { try await actionState.run { try await interactor.deletePoll(poll, currentUserID: currentUser.id) }; interactor.trackEvent(Event.success(operation: .deletePoll, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .deletePoll, error: error, parameters: parameters)); return false }
+    }
+
+    func loadPollsIfNeeded() async {
+        guard !didLoadPolls, let householdID = currentUser.householdId else { return }
+        didLoadPolls = true
+        interactor.trackEvent(Event.start(operation: .loadPolls, parameters: nil))
+        do { try await actionState.run { try await interactor.fetchPolls(householdID: householdID) }; interactor.trackEvent(Event.success(operation: .loadPolls, parameters: nil)) }
+        catch { didLoadPolls = false; interactor.trackEvent(Event.fail(operation: .loadPolls, error: error, parameters: nil)) }
     }
 
     // MARK: - Reminder Actions
@@ -323,19 +399,17 @@ final class HouseholdViewModel {
             reminderAdvance: reminderAdvance
         )
 
-        return await actionState.perform {
-            try await interactor.createHouseReminder(reminder)
-        }
+        let parameters = reminder.eventParameters
+        interactor.trackEvent(Event.start(operation: .addReminder, parameters: parameters))
+        do { try await actionState.run { try await interactor.createHouseReminder(reminder) }; interactor.trackEvent(Event.success(operation: .addReminder, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .addReminder, error: error, parameters: parameters)); return false }
     }
 
     func deleteReminder(_ reminder: HouseReminderModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.deleteHouseReminder(
-                reminder,
-                currentUserID: currentUser.id,
-                ownerUserID: householdOwnerUserID
-            )
-        }
+        let parameters = reminder.eventParameters
+        interactor.trackEvent(Event.start(operation: .deleteReminder, parameters: parameters))
+        do { try await actionState.run { try await interactor.deleteHouseReminder(reminder, currentUserID: currentUser.id, ownerUserID: householdOwnerUserID) }; interactor.trackEvent(Event.success(operation: .deleteReminder, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .deleteReminder, error: error, parameters: parameters)); return false }
     }
 
     func updateReminder(
@@ -355,16 +429,21 @@ final class HouseholdViewModel {
         updatedReminder.category = category
         updatedReminder.reminderAdvance = reminderAdvance
 
-        return await actionState.perform {
-            try await interactor.updateHouseReminder(
-                updatedReminder,
-                currentUserID: currentUser.id,
-                ownerUserID: householdOwnerUserID
-            )
-        }
+        let parameters = updatedReminder.eventParameters
+        interactor.trackEvent(Event.start(operation: .updateReminder, parameters: parameters))
+        do { try await actionState.run { try await interactor.updateHouseReminder(updatedReminder, currentUserID: currentUser.id, ownerUserID: householdOwnerUserID) }; interactor.trackEvent(Event.success(operation: .updateReminder, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .updateReminder, error: error, parameters: parameters)); return false }
     }
 
     // MARK: - Document Actions
+
+    func loadDocumentsIfNeeded() async {
+        guard !didLoadDocuments, let householdID = currentUser.householdId else { return }
+        didLoadDocuments = true
+        interactor.trackEvent(Event.start(operation: .loadDocuments, parameters: nil))
+        do { try await actionState.run { try await interactor.fetchHouseholdDocuments(householdID: householdID) }; interactor.trackEvent(Event.success(operation: .loadDocuments, parameters: nil)) }
+        catch { didLoadDocuments = false; interactor.trackEvent(Event.fail(operation: .loadDocuments, error: error, parameters: nil)) }
+    }
 
     func addDocument(
         title: String,
@@ -396,25 +475,28 @@ final class HouseholdViewModel {
             warrantyExpiresAt: warrantyExpiresAt,
             serialNumber: serialNumber
         )
-        return await actionState.perform {
-            try await interactor.createHouseholdDocument(document, attachment: attachment)
-        }
+        let parameters = document.eventParameters
+        interactor.trackEvent(Event.start(operation: .addDocument, parameters: parameters))
+        do { try await actionState.run { try await interactor.createHouseholdDocument(document, attachment: attachment) }; interactor.trackEvent(Event.success(operation: .addDocument, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .addDocument, error: error, parameters: parameters)); return false }
     }
 
     func deleteDocument(_ document: HouseholdDocumentModel) async -> Bool {
         guard document.createdByUserId == currentUser.id
                 || currentUser.id == householdOwnerUserID else { return false }
-        return await actionState.perform {
-            try await interactor.deleteHouseholdDocument(document)
-        }
+        let parameters = document.eventParameters
+        interactor.trackEvent(Event.start(operation: .deleteDocument, parameters: parameters))
+        do { try await actionState.run { try await interactor.deleteHouseholdDocument(document) }; interactor.trackEvent(Event.success(operation: .deleteDocument, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .deleteDocument, error: error, parameters: parameters)); return false }
     }
 
     func updateDocument(_ document: HouseholdDocumentModel) async -> Bool {
         guard document.createdByUserId == currentUser.id
                 || currentUser.id == householdOwnerUserID else { return false }
-        return await actionState.perform {
-            try await interactor.updateHouseholdDocument(document)
-        }
+        let parameters = document.eventParameters
+        interactor.trackEvent(Event.start(operation: .updateDocument, parameters: parameters))
+        do { try await actionState.run { try await interactor.updateHouseholdDocument(document) }; interactor.trackEvent(Event.success(operation: .updateDocument, parameters: parameters)); return true }
+        catch { interactor.trackEvent(Event.fail(operation: .updateDocument, error: error, parameters: parameters)); return false }
     }
 
     func refreshData() async {
@@ -422,13 +504,93 @@ final class HouseholdViewModel {
             return
         }
 
-        await actionState.capture {
-            try await interactor.fetchTasks(householdID: householdID, currentUserID: currentUser.id)
-            try await interactor.fetchShoppingItems(householdID: householdID)
-            try await interactor.fetchBills(householdID: householdID)
-            try await interactor.fetchPolls(householdID: householdID)
-            try await interactor.fetchHouseReminders(householdID: householdID)
-            try await interactor.fetchHouseholdDocuments(householdID: householdID)
+        interactor.trackEvent(Event.start(operation: .refreshData, parameters: nil))
+        do {
+            try await actionState.run {
+                try await interactor.fetchTasks(householdID: householdID, currentUserID: currentUser.id)
+                try await interactor.fetchShoppingItems(householdID: householdID)
+                try await interactor.fetchBills(householdID: householdID)
+                try await interactor.fetchPolls(householdID: householdID)
+                try await interactor.fetchHouseReminders(householdID: householdID)
+                try await interactor.fetchHouseholdDocuments(householdID: householdID)
+            }
+            interactor.trackEvent(Event.success(operation: .refreshData, parameters: nil))
+        } catch { interactor.trackEvent(Event.fail(operation: .refreshData, error: error, parameters: nil)) }
+    }
+
+    enum Event: LoggableEvent {
+        case addBillStart(bill: BillModel)
+        case addBillSuccess(bill: BillModel)
+        case addBillFail(error: Error, bill: BillModel)
+
+        case start(operation: Operation, parameters: [String: Any]?)
+        case success(operation: Operation, parameters: [String: Any]?)
+        case fail(operation: Operation, error: Error, parameters: [String: Any]?)
+
+        enum Operation: String {
+            case saveShoppingList = "SaveShoppingList"
+            case moveShoppingItem = "MoveShoppingItem"
+            case addChore = "AddChore"
+            case toggleTaskStatus = "ToggleTaskStatus"
+            case deleteTask = "DeleteTask"
+            case fetchTasks = "FetchTasks"
+            case loadMoreTasks = "LoadMoreTasks"
+            case addShoppingItem = "AddShoppingItem"
+            case toggleShoppingItem = "ToggleShoppingItem"
+            case deleteShoppingItem = "DeleteShoppingItem"
+            case clearPurchasedShoppingItems = "ClearPurchasedShoppingItems"
+            case fetchShoppingItems = "FetchShoppingItems"
+            case addBill = "AddBill"
+            case markBillAsPaid = "MarkBillAsPaid"
+            case deleteBill = "DeleteBill"
+            case fetchBills = "FetchBills"
+            case addPoll = "AddPoll"
+            case vote = "Vote"
+            case removeVote = "RemoveVote"
+            case closePoll = "ClosePoll"
+            case deletePoll = "DeletePoll"
+            case loadPolls = "LoadPolls"
+            case addReminder = "AddReminder"
+            case deleteReminder = "DeleteReminder"
+            case updateReminder = "UpdateReminder"
+            case loadDocuments = "LoadDocuments"
+            case addDocument = "AddDocument"
+            case deleteDocument = "DeleteDocument"
+            case updateDocument = "UpdateDocument"
+            case refreshData = "RefreshData"
+        }
+
+        var eventName: String {
+            switch self {
+            case .addBillStart: "HouseholdView_AddBill_Start"
+            case .addBillSuccess: "HouseholdView_AddBill_Success"
+            case .addBillFail: "HouseholdView_AddBill_Fail"
+            case .start(let operation, _): "HouseholdView_\(operation.rawValue)_Start"
+            case .success(let operation, _): "HouseholdView_\(operation.rawValue)_Success"
+            case .fail(let operation, _, _): "HouseholdView_\(operation.rawValue)_Fail"
+            }
+        }
+
+        var parameters: [String: Any]? {
+            switch self {
+            case .addBillStart(let bill), .addBillSuccess(let bill):
+                bill.eventParameters
+            case .addBillFail(let error, let bill):
+                bill.eventParameters.merging(error.eventParameters) { current, _ in current }
+            case .start(_, let parameters), .success(_, let parameters):
+                parameters
+            case .fail(_, let error, let parameters):
+                (parameters ?? [:]).merging(error.eventParameters) { current, _ in current }
+            }
+        }
+
+        var type: LogType {
+            switch self {
+            case .addBillFail, .fail:
+                return .severe
+            default:
+                return .analytic
+            }
         }
     }
 }
@@ -476,6 +638,7 @@ struct HouseholdView: View {
             content
             toastOverlay
         }
+        .screenAppearAnalytics(name: "HouseholdView")
         .sheet(item: $activeSheet) { sheet in
             sheetContent(for: sheet)
         }
@@ -648,13 +811,17 @@ struct HouseholdView: View {
     }
 
     private func featureAction(for feature: HouseholdFeature) -> () -> Void {
-        switch feature {
+        let action: () -> Void = switch feature {
         case .bills: onOpenBills
         case .cleaning: onOpenCleaning
         case .shopping: onOpenShopping
         case .polls: onOpenPolls
         case .reminders: onOpenReminders
         case .documents: onOpenDocuments
+        }
+
+        return {
+            action()
         }
     }
 

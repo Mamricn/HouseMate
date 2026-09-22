@@ -2,10 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>MixpanelTokenDevelopment</key>
+	<string>116f2b64e76337eaadf4540fae35f4eb</string>
+	<key>MixpanelTokenProduction</key>
+	<string>5d137463c46246d2e2f8223b10d8d6c8</string>
 	<key>FirebaseMessagingInstallationIdEnabled</key>
 	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>HouseMate</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>housemate</string>
+			</array>
+		</dict>
 		<dict>
 			<key>CFBundleIdentifier</key>
 			<string></string>

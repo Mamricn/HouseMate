@@ -79,18 +79,19 @@ final class HousematesViewModel {
             imageUrl: nil
         )
 
-        return await actionState.perform {
-            try await interactor.createBoardPost(newPost)
-        }
+        interactor.trackEvent(Event.addPostStart(post: newPost))
+        do {
+            try await actionState.run { try await interactor.createBoardPost(newPost) }
+            interactor.trackEvent(Event.addPostSuccess(post: newPost)); return true
+        } catch { interactor.trackEvent(Event.addPostFail(error: error, post: newPost)); return false }
     }
 
     func deletePost(_ post: BoardPostModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.deleteBoardPost(
-                post,
-                currentUserID: currentUser.id
-            )
-        }
+        interactor.trackEvent(Event.deletePostStart(post: post))
+        do {
+            try await actionState.run { try await interactor.deleteBoardPost(post, currentUserID: currentUser.id) }
+            interactor.trackEvent(Event.deletePostSuccess(post: post)); return true
+        } catch { interactor.trackEvent(Event.deletePostFail(error: error, post: post)); return false }
     }
 
     func fetchInitialPosts() async {
@@ -98,16 +99,20 @@ final class HousematesViewModel {
             return
         }
 
-        await actionState.capture {
-            try await interactor.fetchInitialBoardPosts(householdID: householdID)
-        }
+        interactor.trackEvent(Event.fetchInitialPostsStart)
+        do {
+            try await actionState.run { try await interactor.fetchInitialBoardPosts(householdID: householdID) }
+            interactor.trackEvent(Event.fetchInitialPostsSuccess)
+        } catch { interactor.trackEvent(Event.fetchInitialPostsFail(error: error)) }
     }
 
     func loadMorePosts() {
         Task {
-            await actionState.capture {
-                try await interactor.loadMoreBoardPosts()
-            }
+            interactor.trackEvent(Event.loadMorePostsStart)
+            do {
+                try await actionState.run { try await interactor.loadMoreBoardPosts() }
+                interactor.trackEvent(Event.loadMorePostsSuccess)
+            } catch { interactor.trackEvent(Event.loadMorePostsFail(error: error)) }
         }
     }
 
@@ -116,8 +121,74 @@ final class HousematesViewModel {
             return
         }
 
-        await actionState.capture {
-            try await interactor.fetchInitialBoardPosts(householdID: householdID)
+        interactor.trackEvent(Event.refreshDataStart)
+        do {
+            try await actionState.run { try await interactor.fetchInitialBoardPosts(householdID: householdID) }
+            interactor.trackEvent(Event.refreshDataSuccess)
+        } catch { interactor.trackEvent(Event.refreshDataFail(error: error)) }
+    }
+
+    enum Event: LoggableEvent {
+        case addPostStart(post: BoardPostModel)
+        case addPostSuccess(post: BoardPostModel)
+        case addPostFail(error: Error, post: BoardPostModel)
+        case deletePostStart(post: BoardPostModel)
+        case deletePostSuccess(post: BoardPostModel)
+        case deletePostFail(error: Error, post: BoardPostModel)
+        case fetchInitialPostsStart
+        case fetchInitialPostsSuccess
+        case fetchInitialPostsFail(error: Error)
+        case loadMorePostsStart
+        case loadMorePostsSuccess
+        case loadMorePostsFail(error: Error)
+        case refreshDataStart
+        case refreshDataSuccess
+        case refreshDataFail(error: Error)
+
+        var eventName: String {
+            switch self {
+            case .addPostStart: "HousematesView_AddPost_Start"
+            case .addPostSuccess: "HousematesView_AddPost_Success"
+            case .addPostFail: "HousematesView_AddPost_Fail"
+            case .deletePostStart: "HousematesView_DeletePost_Start"
+            case .deletePostSuccess: "HousematesView_DeletePost_Success"
+            case .deletePostFail: "HousematesView_DeletePost_Fail"
+            case .fetchInitialPostsStart: "HousematesView_FetchInitialPosts_Start"
+            case .fetchInitialPostsSuccess: "HousematesView_FetchInitialPosts_Success"
+            case .fetchInitialPostsFail: "HousematesView_FetchInitialPosts_Fail"
+            case .loadMorePostsStart: "HousematesView_LoadMorePosts_Start"
+            case .loadMorePostsSuccess: "HousematesView_LoadMorePosts_Success"
+            case .loadMorePostsFail: "HousematesView_LoadMorePosts_Fail"
+            case .refreshDataStart: "HousematesView_RefreshData_Start"
+            case .refreshDataSuccess: "HousematesView_RefreshData_Success"
+            case .refreshDataFail: "HousematesView_RefreshData_Fail"
+            }
+        }
+
+        var parameters: [String: Any]? {
+            switch self {
+            case .addPostStart(let post), .addPostSuccess(let post),
+                 .deletePostStart(let post), .deletePostSuccess(let post):
+                post.eventParameters
+            case .addPostFail(let error, let post),
+                 .deletePostFail(let error, let post):
+                post.eventParameters.merging(error.eventParameters) { current, _ in current }
+            case .fetchInitialPostsFail(let error), .loadMorePostsFail(let error),
+                 .refreshDataFail(let error):
+                error.eventParameters
+            default:
+                nil
+            }
+        }
+
+        var type: LogType {
+            switch self {
+            case .addPostFail, .deletePostFail, .fetchInitialPostsFail,
+                 .loadMorePostsFail, .refreshDataFail:
+                .severe
+            default:
+                .analytic
+            }
         }
     }
 }
@@ -146,6 +217,7 @@ struct HousematesView: View {
             content
             toastOverlay
         }
+        .screenAppearAnalytics(name: "HousematesView")
         .sheet(item: $activeSheet) { sheet in
             sheetContent(for: sheet)
         }

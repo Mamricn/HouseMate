@@ -65,19 +65,27 @@ final class AccountSettingsViewModel {
         _ result: Result<ASAuthorization, Error>,
         mode: AccountDeletionMode
     ) async -> Bool {
-        await actionState.perform {
-            try await interactor.reauthenticateWithApple(result)
-            try await deleteAccount(mode: mode)
-        }
+        interactor.trackEvent(Event.deleteWithAppleStart(mode: mode))
+        do {
+            try await actionState.run {
+                try await interactor.reauthenticateWithApple(result)
+                try await deleteAccount(mode: mode)
+            }
+            interactor.trackEvent(Event.deleteWithAppleSuccess(mode: mode)); return true
+        } catch { interactor.trackEvent(Event.deleteWithAppleFail(error: error, mode: mode)); return false }
     }
 
     func deleteWithGoogle(
         mode: AccountDeletionMode
     ) async -> Bool {
-        await actionState.perform {
-            try await interactor.reauthenticateWithGoogle()
-            try await deleteAccount(mode: mode)
-        }
+        interactor.trackEvent(Event.deleteWithGoogleStart(mode: mode))
+        do {
+            try await actionState.run {
+                try await interactor.reauthenticateWithGoogle()
+                try await deleteAccount(mode: mode)
+            }
+            interactor.trackEvent(Event.deleteWithGoogleSuccess(mode: mode)); return true
+        } catch { interactor.trackEvent(Event.deleteWithGoogleFail(error: error, mode: mode)); return false }
     }
 
     private func deleteAccount(
@@ -112,6 +120,44 @@ final class AccountSettingsViewModel {
         try await interactor.deleteUserData(userID: user.id)
         try await interactor.deleteCurrentAuthUser()
     }
+
+    enum Event: LoggableEvent {
+        case deleteWithAppleStart(mode: AccountDeletionMode)
+        case deleteWithAppleSuccess(mode: AccountDeletionMode)
+        case deleteWithAppleFail(error: Error, mode: AccountDeletionMode)
+        case deleteWithGoogleStart(mode: AccountDeletionMode)
+        case deleteWithGoogleSuccess(mode: AccountDeletionMode)
+        case deleteWithGoogleFail(error: Error, mode: AccountDeletionMode)
+
+        var eventName: String {
+            switch self {
+            case .deleteWithAppleStart: "AccountSettingsView_DeleteWithApple_Start"
+            case .deleteWithAppleSuccess: "AccountSettingsView_DeleteWithApple_Success"
+            case .deleteWithAppleFail: "AccountSettingsView_DeleteWithApple_Fail"
+            case .deleteWithGoogleStart: "AccountSettingsView_DeleteWithGoogle_Start"
+            case .deleteWithGoogleSuccess: "AccountSettingsView_DeleteWithGoogle_Success"
+            case .deleteWithGoogleFail: "AccountSettingsView_DeleteWithGoogle_Fail"
+            }
+        }
+
+        var parameters: [String: Any]? {
+            switch self {
+            case .deleteWithAppleStart(let mode), .deleteWithAppleSuccess(let mode),
+                 .deleteWithGoogleStart(let mode), .deleteWithGoogleSuccess(let mode):
+                ["deletion_mode": mode.rawValue]
+            case .deleteWithAppleFail(let error, let mode),
+                 .deleteWithGoogleFail(let error, let mode):
+                ["deletion_mode": mode.rawValue].merging(error.eventParameters) { current, _ in current }
+            }
+        }
+
+        var type: LogType {
+            switch self {
+            case .deleteWithAppleFail, .deleteWithGoogleFail: .severe
+            default: .analytic
+            }
+        }
+    }
 }
 
 struct AccountSettingsView: View {
@@ -139,6 +185,7 @@ struct AccountSettingsView: View {
         }
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.inline)
+        .screenAppearAnalytics(name: "AccountSettingsView")
         .sheet(item: $deletionMode) { mode in
             DeleteAccountConfirmationView(
                 viewModel: viewModel,

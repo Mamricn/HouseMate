@@ -5,10 +5,26 @@
 
 import Foundation
 
+struct TaskPageCursor {
+    let dueDate: Date
+    let documentID: String
+}
+
+struct TaskPage {
+    let tasks: [TaskModel]
+    let nextCursor: TaskPageCursor?
+}
+
 @MainActor
 protocol TaskServiceProtocol: AnyObject {
 
-    func fetchTasks(householdID: String, from startDate: Date, to endDate: Date, limit: Int) async throws -> [TaskModel]
+    func fetchTasksPage(
+        householdID: String,
+        from startDate: Date,
+        to endDate: Date,
+        limit: Int,
+        after cursor: TaskPageCursor?
+    ) async throws -> TaskPage
 
     func observeTasks(householdID: String, from startDate: Date, to endDate: Date, limit: Int, onChange: @escaping (Result<[TaskModel], Error>) -> Void) -> ServiceObservation?
 

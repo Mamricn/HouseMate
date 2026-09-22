@@ -70,6 +70,8 @@ struct AddHouseReminderView: View {
                 confirmationToolbar
             }
         }
+        .onAppear {
+        }
     }
 
     // MARK: - Information

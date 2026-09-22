@@ -120,6 +120,13 @@ struct PollOptionModel: Identifiable, Codable, Equatable {
         case optionId = "option_id"
         case text
     }
+
+    var eventParameters: [String: Any] {
+        [
+            "poll_option_\(CodingKeys.optionId.rawValue)": optionId,
+            "poll_option_\(CodingKeys.text.rawValue)": text
+        ]
+    }
 }
 
 // MARK: - Poll Status

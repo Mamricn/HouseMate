@@ -61,7 +61,7 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
         content.body = "You’ll receive reminders about chores, bills and household events."
         content.sound = .default
         content.userInfo = [
-            "destination": NotificationDestination.household.rawValue,
+            "destination": NotificationDestination.reminders.rawValue,
             "type": NotificationType.houseReminder.rawValue
         ]
 
@@ -90,7 +90,7 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
             "type": NotificationType.houseReminder.rawValue,
             "household_id": reminder.householdId,
             "reminder_id": reminder.reminderId,
-            "destination": NotificationDestination.housemates.rawValue
+            "destination": NotificationDestination.reminders.rawValue
         ]
 
         let dateComponents = Calendar.autoupdatingCurrent.dateComponents(
@@ -145,7 +145,7 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
                 "type": NotificationType.taskDue.rawValue,
                 "household_id": task.householdId,
                 "task_id": task.taskId,
-                "destination": NotificationDestination.household.rawValue
+                "destination": NotificationDestination.tasks.rawValue
             ]
         )
     }
@@ -186,7 +186,7 @@ final class LocalNotificationService: LocalNotificationServiceProtocol {
                 "type": NotificationType.billDue.rawValue,
                 "household_id": bill.householdId,
                 "bill_id": bill.billId,
-                "destination": NotificationDestination.household.rawValue
+                "destination": NotificationDestination.bills.rawValue
             ]
         )
     }

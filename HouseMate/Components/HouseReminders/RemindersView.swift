@@ -79,7 +79,9 @@ struct RemindersView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: onAdd) {
+                Button {
+                    onAdd()
+                } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add reminder")

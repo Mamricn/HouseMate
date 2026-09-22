@@ -176,7 +176,11 @@ struct ShoppingCollectionsView: View {
                             .background(selectedID == list.id ? Color.mint : Color.primary.opacity(0.06), in: Capsule())
                     }
                     .buttonStyle(.plain)
-                    .contextMenu { Button("Edit list", systemImage: "pencil") { editingList = list } }
+                    .contextMenu {
+                        Button("Edit list", systemImage: "pencil") {
+                            editingList = list
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 18)
@@ -307,7 +311,9 @@ struct ShoppingListView: View {
         .toolbar {
             if showsAddButton {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: onAdd) {
+                Button {
+                    onAdd()
+                } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add shopping item")
@@ -418,7 +424,9 @@ struct ShoppingListView: View {
                             .contextMenu {
                                 Menu("Move to list") {
                                     ForEach(lists.filter { $0.id != item.shoppingListID }) { list in
-                                        Button(list.name, systemImage: list.symbol) { onMove(item, list.id) }
+                                        Button(list.name, systemImage: list.symbol) {
+                                            onMove(item, list.id)
+                                        }
                                     }
                                 }
                             }

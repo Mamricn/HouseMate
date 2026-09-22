@@ -24,6 +24,7 @@ final class DependencyContainer {
     let localNotificationService: any LocalNotificationServiceProtocol
     let remoteNotificationService: any RemoteNotificationServiceProtocol
     let profileImageService: any ProfileImageServiceProtocol
+    let logService: any LogService
 
     init(
         authService: any AuthServiceProtocol,
@@ -39,7 +40,8 @@ final class DependencyContainer {
         notificationManager: NotificationManager,
         localNotificationService: any LocalNotificationServiceProtocol,
         remoteNotificationService: any RemoteNotificationServiceProtocol,
-        profileImageService: any ProfileImageServiceProtocol
+        profileImageService: any ProfileImageServiceProtocol,
+        logService: any LogService
     ) {
         self.authService = authService
         self.userService = userService
@@ -55,6 +57,7 @@ final class DependencyContainer {
         self.localNotificationService = localNotificationService
         self.remoteNotificationService = remoteNotificationService
         self.profileImageService = profileImageService
+        self.logService = logService
     }
 
     static func make() -> DependencyContainer {
@@ -94,7 +97,8 @@ final class DependencyContainer {
                 notificationManager: NotificationManager(service: MockNotificationService()),
                 localNotificationService: localNotificationService,
                 remoteNotificationService: MockRemoteNotificationService(),
-                profileImageService: MockProfileImageService()
+                profileImageService: MockProfileImageService(),
+                logService: AnalyticsServiceFactory.make(for: .mock)
             )
 
         case .development, .production:
@@ -124,7 +128,8 @@ final class DependencyContainer {
                 notificationManager: NotificationManager(service: FirebaseNotificationService()),
                 localNotificationService: localNotificationService,
                 remoteNotificationService: FirebaseRemoteNotificationService.shared,
-                profileImageService: FirebaseProfileImageService()
+                profileImageService: FirebaseProfileImageService(),
+                logService: AnalyticsServiceFactory.make(for: environment)
             )
         }
     }

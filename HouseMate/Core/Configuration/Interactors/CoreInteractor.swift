@@ -55,6 +55,9 @@ struct CoreInteractor {
     private let profileImageService:
         any ProfileImageServiceProtocol
 
+    private let logService:
+        any LogService
+
     init(
         container: DependencyContainer
     ) {
@@ -72,6 +75,32 @@ struct CoreInteractor {
         self.localNotificationService = container.localNotificationService
         self.remoteNotificationService = container.remoteNotificationService
         self.profileImageService = container.profileImageService
+        self.logService = container.logService
+    }
+
+    // MARK: - Analytics
+
+    func identifyAnalyticsUser(userID: String) {
+        logService.identifyUser(userID: userID)
+        logService.addUserProperties([
+            "environment": AppEnvironment.current.rawValue
+        ])
+    }
+
+    func resetAnalyticsUser() {
+        logService.resetUser()
+    }
+
+    func deleteAnalyticsUserProfile() {
+        logService.deleteUserProfile()
+    }
+
+    func trackEvent(_ event: any LoggableEvent) {
+        logService.trackEvent(event)
+    }
+
+    func trackScreen(_ event: any LoggableEvent) {
+        logService.trackScreen(event)
     }
 
     // MARK: - Authentication
@@ -110,13 +139,11 @@ struct CoreInteractor {
         let isAuthorized = try await localNotificationService
             .requestAuthorization()
 
-        #if DEBUG
-        print("Notification permission granted: \(isAuthorized)")
-        #endif
+            #if DEBUG
+            print("Notification permission granted: \(isAuthorized)")
+            #endif
 
-        guard isAuthorized else {
-            return
-        }
+        guard isAuthorized else { return }
 
         try await remoteNotificationService.registerDevice(for: user)
     }
@@ -158,9 +185,7 @@ struct CoreInteractor {
     func createUser(
         from authInfo: UserAuthInfo
     ) async throws -> UserModel {
-        try await userService.createUser(
-            from: authInfo
-        )
+        try await userService.createUser(from: authInfo)
     }
 
     func saveUser(
@@ -260,6 +285,16 @@ struct CoreInteractor {
         )
     }
 
+    func restoreCachedHousehold(
+        _ household: HouseholdModel,
+        members: [HouseholdMemberModel]
+    ) {
+        householdManager.restoreCachedHousehold(
+            household,
+            members: members
+        )
+    }
+
     func clearCurrentHousehold() {
         householdManager.clearCurrentHousehold()
     }
@@ -276,7 +311,7 @@ struct CoreInteractor {
 
     func runWeeklyAssignmentNow(requestedByUserID: String) async throws {
         try await householdManager.runWeeklyAssignmentNow(
-            requestedByUserID: requestedByUserID
+                requestedByUserID: requestedByUserID
         )
     }
 
@@ -301,9 +336,7 @@ struct CoreInteractor {
     }
 
     func leaveHousehold(userID: String) async throws {
-        try await householdManager.leaveHousehold(
-            userID: userID
-        )
+        try await householdManager.leaveHousehold(userID: userID)
     }
 
     func deleteHousehold(
@@ -320,8 +353,15 @@ struct CoreInteractor {
         taskManager.tasks
     }
 
+    var canLoadMoreTasks: Bool { taskManager.canLoadMore }
+    var isLoadingMoreTasks: Bool { taskManager.isLoadingMore }
+
     func fetchTasks(householdID: String, currentUserID: String) async throws {
         try await taskManager.fetchTasks(householdID: householdID, currentUserID: currentUserID)
+    }
+
+    func loadMoreTasks() async throws {
+        try await taskManager.loadMoreTasks()
     }
 
     func createTask(_ task: TaskModel) async throws {

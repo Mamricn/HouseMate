@@ -11,6 +11,8 @@ struct TaskCardView: View {
 
     let tasks: [TaskModel]
 
+    @State private var completingTaskIDs: Set<String> = []
+
     var showsAddButton: Bool = true
     var usesThinMaterial: Bool = true
     var onOpenAll: () -> Void = {}
@@ -82,11 +84,28 @@ struct TaskCardView: View {
         ScrollView {
             LazyVStack(spacing: 4) {
                 ForEach(tasks) { task in
-                    TaskRowView(task: task)
+                    TaskRowView(task: displayedTask(for: task))
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            )
+                        )
                         .contentShape(Rectangle())
                         .onTapGesture {
+                            guard !completingTaskIDs.contains(task.id) else {
+                                return
+                            }
+
                             HapticFeedback.selection()
-                            onToggleStatus(task)
+
+                            withAnimation(.snappy(duration: 0.22)) {
+                                _ = completingTaskIDs.insert(task.id)
+                            }
+
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                onToggleStatus(task)
+                            }
                         }
                 }
             }
@@ -94,6 +113,17 @@ struct TaskCardView: View {
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: min(CGFloat(tasks.count) * 58, 180))
+        .animation(.snappy(duration: 0.3), value: tasks.map(\.id))
+    }
+
+    private func displayedTask(for task: TaskModel) -> TaskModel {
+        guard completingTaskIDs.contains(task.id) else {
+            return task
+        }
+
+        var completedTask = task
+        completedTask.status = .completed
+        return completedTask
     }
 }
 

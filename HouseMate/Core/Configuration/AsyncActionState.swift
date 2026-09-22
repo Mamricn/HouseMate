@@ -9,25 +9,46 @@ import Foundation
 @MainActor
 final class AsyncActionState {
 
+    enum ActionError: LocalizedError {
+        case operationInProgress
+
+        var errorDescription: String? {
+            "Please wait for the current operation to finish."
+        }
+    }
+
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    private(set) var error: Error?
 
     func perform(_ operation: @MainActor () async throws -> Void) async -> Bool {
-        guard !isLoading else {
-            errorMessage = "Please wait for the current operation to finish."
+        do {
+            try await run(operation)
+            return true
+        } catch {
             return false
+        }
+    }
+
+    func run(_ operation: @MainActor () async throws -> Void) async throws {
+        guard !isLoading else {
+            let error = ActionError.operationInProgress
+            self.error = error
+            errorMessage = error.localizedDescription
+            throw error
         }
 
         isLoading = true
         errorMessage = nil
+        error = nil
         defer { isLoading = false }
 
         do {
             try await operation()
-            return true
         } catch {
+            self.error = error
             errorMessage = error.localizedDescription
-            return false
+            throw error
         }
     }
 
@@ -36,6 +57,7 @@ final class AsyncActionState {
     }
 
     func clearError() {
+        error = nil
         errorMessage = nil
     }
 }

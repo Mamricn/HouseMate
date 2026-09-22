@@ -14,8 +14,13 @@ struct CleaningScheduleView: View {
     var onAdd: () -> Void = {}
     var onToggleStatus: (TaskModel) -> Void = { _ in }
     var onDelete: (TaskModel) -> Void = { _ in }
+    var canLoadMore = false
+    var isLoadingMore = false
+    var onEnsureTaskCount: (Date, Int) async -> Void = { _, _ in }
 
     private let calendar = Calendar.autoupdatingCurrent
+    private let pageSize = 10
+    @State private var visibleTaskLimit = 10
 
     var body: some View {
         ZStack {
@@ -26,6 +31,7 @@ struct CleaningScheduleView: View {
                     weekCard
                     progressCard
                     tasksSection
+                    loadMoreButton
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 12)
@@ -35,11 +41,57 @@ struct CleaningScheduleView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: onAdd) {
+                Button {
+                    onAdd()
+                } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add chore")
             }
+        }
+        .task(id: selectedDay) {
+            visibleTaskLimit = pageSize
+            await onEnsureTaskCount(selectedDate, pageSize)
+        }
+    }
+
+    @ViewBuilder
+    private var loadMoreButton: some View {
+        if canLoadMore {
+            Button {
+                let requestedCount = visibleTaskLimit + pageSize
+                visibleTaskLimit = requestedCount
+                Task {
+                    await onEnsureTaskCount(selectedDate, requestedCount)
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    if isLoadingMore {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(isLoadingMore ? "Loading…" : "Load more chores")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
+            .disabled(isLoadingMore)
+            .cleaningSurface()
+        } else if selectedDateTasks.count > visibleTaskLimit {
+            Button {
+                visibleTaskLimit += pageSize
+            } label: {
+                Text("Load more chores")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
+            .cleaningSurface()
         }
     }
 
@@ -176,7 +228,7 @@ struct CleaningScheduleView: View {
                     .padding(.horizontal, 4)
 
                 VStack(spacing: 0) {
-                    ForEach(Array(selectedDateTasks.enumerated()), id: \.element.id) { index, task in
+                    ForEach(Array(visibleSelectedDateTasks.enumerated()), id: \.element.id) { index, task in
                         let member = members.first { $0.userId == task.assignedToUserId }
 
                         HouseMateSwipeRow(
@@ -198,7 +250,7 @@ struct CleaningScheduleView: View {
                         }
                         .frame(maxWidth: .infinity)
 
-                        if index < selectedDateTasks.count - 1 {
+                        if index < visibleSelectedDateTasks.count - 1 {
                             Divider().padding(.leading, 58)
                         }
                     }
@@ -218,6 +270,14 @@ struct CleaningScheduleView: View {
                 if $0.isAllDay != $1.isAllDay { return $0.isAllDay }
                 return ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture)
             }
+    }
+
+    private var visibleSelectedDateTasks: [TaskModel] {
+        Array(selectedDateTasks.prefix(visibleTaskLimit))
+    }
+
+    private var selectedDay: Date {
+        calendar.startOfDay(for: selectedDate)
     }
 
     private func cleaningTaskRow(
@@ -272,18 +332,21 @@ struct CleaningScheduleView: View {
 
             Spacer(minLength: 8)
 
-            Image(systemName: task.status == .completed ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 24))
+            Image(
+                systemName: task.status == .completed
+                    ? "checkmark.circle"
+                    : "circle"
+            )
+                .font(.title2)
                 .foregroundStyle(
                     task.status == .completed
-                        ? Color.blue
-                        : Color.primary.opacity(0.48)
+                        ? .blue
+                        : .secondary
                 )
-                .contentTransition(.symbolEffect(.replace))
+                .animation(.snappy(duration: 0.22), value: task.status)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 2)
-        .animation(.snappy(duration: 0.22), value: task.status)
     }
 
     private func taskTime(_ task: TaskModel) -> String {

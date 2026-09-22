@@ -49,6 +49,18 @@ service cloud.firestore {
       return data.get('household_id', '') == householdId;
     }
 
+    function hasDocumentIdentity(data, idField, documentId, householdId) {
+      return data.get(idField, '') == documentId
+        && belongsToHousehold(data, householdId);
+    }
+
+    function preservesFields(fields) {
+      return !request.resource.data
+        .diff(resource.data)
+        .affectedKeys()
+        .hasAny(fields);
+    }
+
     function validShoppingList(data, listId) {
       return data.keys().hasOnly([
           'id',
@@ -101,9 +113,18 @@ service cloud.firestore {
       allow delete: if isSelf(userId);
 
       match /notifications/{notificationId} {
-        allow read, update, delete: if isSelf(userId);
+        allow read, delete: if isSelf(userId);
+
+        allow update: if isSelf(userId)
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['is_read'])
+          && request.resource.data.get('is_read', false) == true;
 
         allow create: if isSelf(userId)
+          && request.resource.data.get('notification_id', '')
+            == notificationId
           && request.resource.data.get(
             'recipient_user_id',
             ''
@@ -240,15 +261,43 @@ service cloud.firestore {
       match /tasks/{taskId} {
         allow read: if isHouseholdMember(householdId);
         allow create: if isHouseholdMember(householdId)
-          && belongsToHousehold(request.resource.data, householdId);
-        allow update, delete: if isHouseholdMember(householdId);
+          && hasDocumentIdentity(
+            request.resource.data,
+            'task_id',
+            taskId,
+            householdId
+          )
+          && request.resource.data.get('created_by_user_id', '')
+            == request.auth.uid;
+        allow update: if isHouseholdMember(householdId)
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['status']);
+        allow delete: if isHouseholdMember(householdId);
       }
 
       match /shopping_items/{itemId} {
         allow read: if isHouseholdMember(householdId);
         allow create: if isHouseholdMember(householdId)
-          && belongsToHousehold(request.resource.data, householdId);
-        allow update, delete: if isHouseholdMember(householdId);
+          && hasDocumentIdentity(
+            request.resource.data,
+            'item_id',
+            itemId,
+            householdId
+          )
+          && request.resource.data.get('added_by_user_id', '')
+            == request.auth.uid;
+        allow update: if isHouseholdMember(householdId)
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'list_id',
+              'is_purchased',
+              'purchased_at'
+            ]);
+        allow delete: if isHouseholdMember(householdId);
       }
 
       match /shopping_lists/{listId} {
@@ -271,14 +320,36 @@ service cloud.firestore {
       match /bills/{billId} {
         allow read: if isHouseholdMember(householdId);
         allow create: if isHouseholdMember(householdId)
-          && belongsToHousehold(request.resource.data, householdId);
-        allow update, delete: if isHouseholdMember(householdId);
+          && hasDocumentIdentity(
+            request.resource.data,
+            'bill_id',
+            billId,
+            householdId
+          );
+        allow update: if isHouseholdMember(householdId)
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'status',
+              'paid_by_user_id',
+              'paid_at'
+            ])
+          && request.resource.data.get('status', '') == 'paid'
+          && request.resource.data.get('paid_by_user_id', '')
+            == request.auth.uid;
+        allow delete: if isHouseholdMember(householdId);
       }
 
       match /board_posts/{postId} {
         allow read: if isHouseholdMember(householdId);
         allow create: if isHouseholdMember(householdId)
-          && belongsToHousehold(request.resource.data, householdId)
+          && hasDocumentIdentity(
+            request.resource.data,
+            'post_id',
+            postId,
+            householdId
+          )
           && request.resource.data.get(
             'created_by_user_id',
             ''
@@ -295,7 +366,12 @@ service cloud.firestore {
       match /polls/{pollId} {
         allow read: if isHouseholdMember(householdId);
         allow create: if isHouseholdMember(householdId)
-          && belongsToHousehold(request.resource.data, householdId)
+          && hasDocumentIdentity(
+            request.resource.data,
+            'poll_id',
+            pollId,
+            householdId
+          )
           && request.resource.data.get(
             'created_by_user_id',
             ''
@@ -305,7 +381,11 @@ service cloud.firestore {
           && request.resource.data
             .diff(resource.data)
             .affectedKeys()
-            .hasOnly(['votes_by_user_id']);
+            .hasOnly(['votes_by_user_id'])
+          && request.resource.data.get('votes_by_user_id', {})
+            .diff(resource.data.get('votes_by_user_id', {}))
+            .affectedKeys()
+            .hasOnly([request.auth.uid]);
 
         allow update: if isHouseholdMember(householdId)
           && resource.data.get('created_by_user_id', '')
@@ -326,7 +406,12 @@ service cloud.firestore {
       match /house_reminders/{reminderId} {
         allow read: if isHouseholdMember(householdId);
         allow create: if isHouseholdMember(householdId)
-          && belongsToHousehold(request.resource.data, householdId)
+          && hasDocumentIdentity(
+            request.resource.data,
+            'reminder_id',
+            reminderId,
+            householdId
+          )
           && request.resource.data.get(
             'created_by_user_id',
             ''
@@ -337,32 +422,77 @@ service cloud.firestore {
             && resource.data.get('created_by_user_id', '')
               == request.auth.uid
           );
-        allow update: if isHouseholdOwner(householdId)
-          || (
-            isHouseholdMember(householdId)
-            && resource.data.get('created_by_user_id', '')
-              == request.auth.uid
-            && request.resource.data.get('created_by_user_id', '')
-              == request.auth.uid
-            && belongsToHousehold(request.resource.data, householdId)
-          );
+        allow update: if (
+            isHouseholdOwner(householdId)
+            || (
+              isHouseholdMember(householdId)
+              && resource.data.get('created_by_user_id', '')
+                == request.auth.uid
+            )
+          )
+          && preservesFields([
+            'reminder_id',
+            'household_id',
+            'created_at',
+            'created_by_user_id'
+          ])
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'title',
+              'details',
+              'first_occurrence_date',
+              'recurrence',
+              'category',
+              'reminder_advance',
+              'next_reminder_at',
+              'time_zone_id'
+            ]);
       }
 
       match /documents/{documentId} {
         allow read: if isHouseholdMember(householdId);
         allow create: if isHouseholdMember(householdId)
-          && belongsToHousehold(request.resource.data, householdId)
+          && hasDocumentIdentity(
+            request.resource.data,
+            'document_id',
+            documentId,
+            householdId
+          )
           && request.resource.data.get('created_by_user_id', '')
             == request.auth.uid;
-        allow update: if isHouseholdOwner(householdId)
-          || (
-            isHouseholdMember(householdId)
-            && resource.data.get('created_by_user_id', '')
-              == request.auth.uid
-            && request.resource.data.get('created_by_user_id', '')
-              == resource.data.get('created_by_user_id', '')
-            && belongsToHousehold(request.resource.data, householdId)
-          );
+        allow update: if (
+            isHouseholdOwner(householdId)
+            || (
+              isHouseholdMember(householdId)
+              && resource.data.get('created_by_user_id', '')
+                == request.auth.uid
+            )
+          )
+          && preservesFields([
+            'document_id',
+            'household_id',
+            'created_at',
+            'created_by_user_id',
+            'file_name',
+            'file_url',
+            'storage_path',
+            'content_type'
+          ])
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'title',
+              'category',
+              'notes',
+              'store_name',
+              'amount',
+              'purchase_date',
+              'warranty_expires_at',
+              'serial_number'
+            ]);
         allow delete: if isHouseholdOwner(householdId)
           || (
             isHouseholdMember(householdId)

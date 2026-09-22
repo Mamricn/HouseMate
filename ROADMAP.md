@@ -19,7 +19,7 @@ notes can remain in `FEATURES.md`.
 - [ ] Split routes into household, account and notification areas
 - [x] Add central destination mapping for new screens
 - [ ] Reset navigation after logout, account deletion or leaving a household
-- [ ] Support opening a specific screen from a notification
+- [x] Support opening a specific screen from a notification
 - [ ] Migrate existing navigation gradually without rewriting every screen at once
 
 ## 2. Household ownership and member management
@@ -91,7 +91,7 @@ notes can remain in `FEATURES.md`.
 - [ ] Add per-category notification preferences
 - [ ] Respect system notification permission status
 - [ ] Handle notifications while the app is open
-- [ ] Add deep linking to the relevant screen or item
+- [x] Add deep linking to the relevant screen (opening a specific item remains follow-up work)
 - [ ] Cancel or reschedule notifications when source data changes
 - [ ] Avoid duplicate local and remote notifications
 
@@ -127,12 +127,14 @@ See `FEATURES.md` for the detailed notification policy.
 
 ## 8. Analytics and diagnostics
 
-- [ ] Add Firebase Analytics
-- [ ] Define a small event naming convention before adding events
-- [ ] Track important flows without personal data in event names or parameters
-- [ ] Track failures and cancelled flows where they provide useful product insight
-- [ ] Add Firebase Crashlytics
-- [ ] Verify that development activity does not pollute production analytics
+- [x] Add Mixpanel product analytics
+- [x] Define a consistent `Screen_Action_Start/Success/Fail` naming convention
+- [x] Track screen appearances and disappearances
+- [x] Track important flows with model and error parameters
+- [x] Keep Development and Production analytics in separate Mixpanel projects
+- [x] Add Firebase Crashlytics for crashes and severe non-fatal errors
+- [x] Build the first Mixpanel product dashboard
+- [x] Verify Crashlytics symbolication in Development and Production
 - [ ] Document analytics and crash reporting in the privacy information
 
 ## 9. Backend security and data quality
@@ -165,6 +167,9 @@ See `FEATURES.md` for the detailed notification policy.
 
 ## Later versions
 
+- [ ] Revisit cold-launch performance without replacing the state-preserving system `TabView`
+- [ ] Profile cold launch with App Launch, Time Profiler and SwiftUI Instruments before changing the UI architecture
+- [ ] Keep the current startup diagnostics as a baseline and investigate the delay between `TabbarView` initialization and its first visible frame
 - [ ] Recurring tasks and richer task history
 - [ ] Recurring bills with permanent payment history
 - [ ] Expense splitting and settlement tracking

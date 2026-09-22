@@ -72,12 +72,17 @@ struct BillsView: View {
                     BillStatisticsView(bills: bills)
                         .navigationTitle("Statistics")
                         .navigationBarTitleDisplayMode(.inline)
+                        .screenAppearAnalytics(name: "BillStatisticsView")
                 } label: {
                     Image(systemName: "chart.bar.xaxis")
                 }
+                .simultaneousGesture(TapGesture().onEnded {
+                })
                 .accessibilityLabel("Open bill statistics")
 
-                Button(action: onAdd) {
+                Button {
+                    onAdd()
+                } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add bill")
@@ -85,7 +90,9 @@ struct BillsView: View {
         }
         .animation(.snappy, value: selectedFilter)
         .animation(.snappy, value: selectedCategory)
-        .onChange(of: selectedFilter) { _, _ in paidPage = 0 }
+        .onChange(of: selectedFilter) { _, filter in
+            paidPage = 0
+        }
         .onChange(of: selectedCategory) { _, _ in paidPage = 0 }
         .onChange(of: allPaidBills.count) { _, _ in
             paidPage = min(paidPage, max(paidPageCount - 1, 0))

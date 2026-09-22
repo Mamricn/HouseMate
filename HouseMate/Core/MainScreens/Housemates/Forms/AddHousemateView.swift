@@ -110,7 +110,7 @@ struct AddHousemateView: View {
     }
 
     private var inviteMessage: String {
-        "You're invited to join \(household.name) on HouseMate. Open HouseMate, choose Join a Home, and enter invite code: \(household.inviteCode)."
+        "You're invited to join \(household.name) on HouseMate: https://housemate-5fbc5.web.app/join/\(household.inviteCode) (invite code: \(household.inviteCode))."
     }
 
     private func copyInviteCode() {

@@ -43,6 +43,7 @@ struct WelcomeView: View {
             .presentationDragIndicator(.hidden)
             .presentationCornerRadius(32)
         }
+        .screenAppearAnalytics(name: "WelcomeView")
     }
 
     private var background: some View {

@@ -45,10 +45,13 @@ final class ShoppingManager {
         }
 
         cancelObservations()
-        let savedLists = try await service.fetchLists(householdID: householdID)
-        mergeLists(savedLists)
         listsObservation = service.observeLists(householdID: householdID) { [weak self] result in
             if case .success(let lists) = result { self?.mergeLists(lists) }
+        }
+
+        if listsObservation == nil {
+            let savedLists = try await service.fetchLists(householdID: householdID)
+            mergeLists(savedLists)
         }
 
         activeObservation = service.observeActiveItems(householdID: householdID, limit: 40) { [weak self] result in

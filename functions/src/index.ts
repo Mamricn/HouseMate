@@ -120,7 +120,7 @@ export const notifyTaskAssigned = onDocumentCreated(
       message,
       is_read: false,
       related_entity_id: taskId,
-      destination: "household",
+      destination: "tasks",
     });
 
     const registrations = await database
@@ -152,11 +152,11 @@ export const notifyTaskAssigned = onDocumentCreated(
             fid,
             notification: {title, body: message},
             data: {
-              notificationId: notificationRef.id,
+              notification_id: notificationRef.id,
               type: "taskAssigned",
-              householdId,
-              relatedEntityId: taskId,
-              destination: "household",
+              household_id: householdId,
+              entity_id: taskId,
+              destination: "tasks",
             },
             apns: {
               payload: {aps: {sound: "default"}},
@@ -246,7 +246,7 @@ export const notifyPollCreated = onDocumentCreated(
           householdId,
           relatedEntityId: pollId,
           type: "newPoll",
-          destination: "housemates",
+          destination: "polls",
           title,
           message,
         })
@@ -321,7 +321,7 @@ export const notifyBoardPostCreated = onDocumentCreated(
           householdId,
           relatedEntityId: postId,
           type: "newBoardPost",
-          destination: "housemates",
+          destination: "household",
           title,
           message,
         })
@@ -401,7 +401,7 @@ export const notifyBillCreated = onDocumentCreated(
           householdId,
           relatedEntityId: billId,
           type: "newBill",
-          destination: "household",
+          destination: "bills",
           title,
           message,
         })
@@ -614,8 +614,8 @@ async function rotateHouseholdChores(input: RotationInput): Promise<void> {
       recipientUserId: assignment.recipientUserId,
       householdId: input.householdSnapshot.id,
       relatedEntityId: assignment.taskId,
-      type: "weeklyTaskAssigned",
-      destination: "household",
+      type: "taskAssigned",
+      destination: "tasks",
       preferenceField: "task_notifications_enabled",
       title: "Your chore for this week",
       message: assignment.title ?? "A household chore was assigned to you.",
@@ -684,7 +684,7 @@ export const sendDueReminders = onSchedule(
           householdId,
           relatedEntityId: taskId,
           type: "taskDue",
-          destination: "household",
+          destination: "tasks",
           preferenceField: "task_notifications_enabled",
           title: task.title ?? "Chore reminder",
           message: "Your chore is due soon.",
@@ -724,7 +724,7 @@ export const sendDueReminders = onSchedule(
             householdId,
             relatedEntityId: billId,
             type: "billDue",
-            destination: "household",
+            destination: "bills",
             preferenceField: "bill_notifications_enabled",
             title: bill.title ?? "Bill reminder",
             message: "A household bill is due soon.",
@@ -768,7 +768,7 @@ export const sendDueReminders = onSchedule(
             householdId,
             relatedEntityId: reminderId,
             type: "houseReminder",
-            destination: "housemates",
+            destination: "reminders",
             preferenceField: "house_reminder_notifications_enabled",
             title: reminder.title ?? "Household reminder",
             message: reminder.details ??
@@ -922,6 +922,11 @@ async function createNotificationAndSendPush(
 
   const registrations = await userReference.collection("device_tokens").get();
   if (registrations.empty) {
+    await notificationRef.set({
+      push_delivery_status: "no_registered_devices",
+      push_attempted_at: FieldValue.serverTimestamp(),
+      push_registered_device_count: 0,
+    }, {merge: true});
     logger.info("Recipient has no registered devices", {
       recipientUserId: input.recipientUserId,
       type: input.type,
@@ -933,7 +938,7 @@ async function createNotificationAndSendPush(
     registrations.docs.map(async (registration) => {
       if (input.preferenceField &&
           registration.get(input.preferenceField) === false) {
-        return;
+        return "preference_disabled";
       }
 
       const fid = registration.get("registration_id") as string | undefined;
@@ -941,7 +946,7 @@ async function createNotificationAndSendPush(
         logger.warn("Registration document has no registration_id", {
           path: registration.ref.path,
         });
-        return;
+        return "missing_registration_id";
       }
 
       try {
@@ -949,14 +954,15 @@ async function createNotificationAndSendPush(
           fid,
           notification: {title: input.title, body: input.message},
           data: {
-            notificationId: notificationRef.id,
+            notification_id: notificationRef.id,
             type: input.type,
-            householdId: input.householdId,
-            relatedEntityId: input.relatedEntityId,
+            household_id: input.householdId,
+            entity_id: input.relatedEntityId,
             destination: input.destination,
           },
           apns: {payload: {aps: {sound: "default"}}},
         });
+        return "accepted";
       } catch (error) {
         if (getErrorCode(error) ===
             "messaging/installation-id-not-registered") {
@@ -964,7 +970,7 @@ async function createNotificationAndSendPush(
           logger.info("Removed an inactive device registration", {
             path: registration.ref.path,
           });
-          return;
+          return "removed_stale";
         }
 
         throw error;
@@ -974,6 +980,27 @@ async function createNotificationAndSendPush(
   const rejectedResults = results.filter(
     (result) => result.status === "rejected"
   );
+  const acceptedCount = results.filter(
+    (result) => result.status === "fulfilled" &&
+      result.value === "accepted"
+  ).length;
+  const failureCodes = rejectedResults.map((result) => {
+    if (result.status !== "rejected") {
+      return "unknown";
+    }
+
+    return getErrorCode(result.reason) ?? "unknown";
+  });
+
+  await notificationRef.set({
+    push_delivery_status: acceptedCount > 0 ?
+      "accepted_by_fcm" :
+      (rejectedResults.length > 0 ? "failed" : "not_sent"),
+    push_attempted_at: FieldValue.serverTimestamp(),
+    push_registered_device_count: registrations.size,
+    push_accepted_device_count: acceptedCount,
+    push_failure_codes: failureCodes,
+  }, {merge: true});
 
   if (rejectedResults.length > 0) {
     throw new Error(

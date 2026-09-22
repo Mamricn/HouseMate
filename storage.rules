@@ -4,9 +4,12 @@ service firebase.storage {
   match /b/{bucket}/o {
     function isHouseholdMember(householdId) {
       return request.auth != null
+        && firestore.exists(
+          /databases/(default)/documents/households/$(householdId)
+        )
         && request.auth.uid in firestore.get(
           /databases/(default)/documents/households/$(householdId)
-        ).data.member_ids;
+        ).data.get('member_ids', []);
     }
 
     match /profile_images/{userId}/{fileName} {
@@ -15,7 +18,8 @@ service firebase.storage {
       allow create, update: if request.auth != null
                             && request.auth.uid == userId
                             && request.resource.size < 5 * 1024 * 1024
-                            && request.resource.contentType.matches('image/jpeg');
+                            && request.resource.contentType.matches('image/jpeg')
+                            && fileName.matches('avatar-[A-Za-z0-9-]+\\.jpg');
 
       allow delete: if request.auth != null
                     && request.auth.uid == userId;
@@ -26,6 +30,7 @@ service firebase.storage {
 
       allow create: if isHouseholdMember(householdId)
                     && request.resource.size < 15 * 1024 * 1024
+                    && fileName.size() > 0
                     && (
                       request.resource.contentType.matches('image/.*')
                       || request.resource.contentType == 'application/pdf'

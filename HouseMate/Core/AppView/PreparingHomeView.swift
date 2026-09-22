@@ -4,26 +4,18 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct PreparingHomeView: View {
 
-    @State private var isPulsing = false
-    @State private var activeDot = 0
-
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         ZStack {
             launchBlue
                 .ignoresSafeArea()
 
-            ambientGlow
-
             VStack(spacing: 22) {
                 logo
-                    .scaleEffect(isPulsing ? 1.04 : 0.96)
-                    .shadow(
-                        color: .white.opacity(isPulsing ? 0.24 : 0.1),
-                        radius: isPulsing ? 18 : 8
-                    )
 
                 VStack(spacing: 8) {
                     Text("Preparing your home")
@@ -35,27 +27,13 @@ struct PreparingHomeView: View {
                         .foregroundStyle(.white.opacity(0.72))
                 }
 
-                loadingDots
+                LaunchLoadingDots(reduceMotion: reduceMotion)
+                    .frame(width: 49, height: 14)
                     .padding(.top, 4)
             }
         }
         .onAppear {
-            withAnimation(
-                .easeInOut(duration: 1.15)
-                    .repeatForever(autoreverses: true)
-            ) {
-                isPulsing = true
-            }
-
-        }
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(360))
-
-                guard !Task.isCancelled else { return }
-
-                activeDot = (activeDot + 1) % 3
-            }
+            StartupDiagnostics.mark("PreparingHomeView visible")
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Preparing your home")
@@ -65,47 +43,14 @@ struct PreparingHomeView: View {
         ZStack {
             Image(systemName: "house.fill")
                 .font(.system(size: 64, weight: .medium))
+                .foregroundStyle(.white)
 
             Image(systemName: "person.2.fill")
                 .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(launchBlue)
                 .offset(y: 10)
-                .blendMode(.destinationOut)
         }
-        .compositingGroup()
-        .foregroundStyle(.white)
-    }
-
-    private var loadingDots: some View {
-        HStack(spacing: 7) {
-            ForEach(0..<3, id: \.self) { index in
-                Circle()
-                    .fill(.white)
-                    .frame(width: 7, height: 7)
-                    .scaleEffect(activeDot == index ? 1 : 0.65)
-                    .opacity(activeDot == index ? 1 : 0.4)
-                    .animation(
-                        .easeInOut(duration: 0.25),
-                        value: activeDot
-                    )
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    private var ambientGlow: some View {
-        ZStack {
-            Circle()
-                .fill(.cyan.opacity(0.18))
-                .frame(width: 260, height: 260)
-                .blur(radius: 75)
-                .offset(x: -150, y: -300)
-
-            Circle()
-                .fill(.purple.opacity(0.22))
-                .frame(width: 290, height: 290)
-                .blur(radius: 85)
-                .offset(x: 165, y: 325)
-        }
+        .shadow(color: .white.opacity(0.14), radius: 8)
     }
 
     private var launchBlue: Color {
@@ -116,6 +61,102 @@ struct PreparingHomeView: View {
         )
     }
 
+}
+
+private struct LaunchLoadingDots: UIViewRepresentable {
+
+    let reduceMotion: Bool
+
+    func makeUIView(context: Context) -> LaunchLoadingDotsView {
+        LaunchLoadingDotsView(reduceMotion: reduceMotion)
+    }
+
+    func updateUIView(_ view: LaunchLoadingDotsView, context: Context) {
+        view.setReduceMotion(reduceMotion)
+    }
+}
+
+private final class LaunchLoadingDotsView: UIView {
+
+    private let dots = (0..<3).map { _ in CAShapeLayer() }
+    private var reduceMotion: Bool
+
+    init(reduceMotion: Bool) {
+        self.reduceMotion = reduceMotion
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+        isAccessibilityElement = false
+
+        dots.forEach {
+            $0.fillColor = UIColor.white.cgColor
+            layer.addSublayer($0)
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        let diameter: CGFloat = 7
+        let spacing: CGFloat = 7
+        let totalWidth = (diameter * 3) + (spacing * 2)
+        let startX = (bounds.width - totalWidth) / 2
+        let y = (bounds.height - diameter) / 2
+
+        for (index, dot) in dots.enumerated() {
+            dot.path = UIBezierPath(
+                ovalIn: CGRect(
+                    x: startX + CGFloat(index) * (diameter + spacing),
+                    y: y,
+                    width: diameter,
+                    height: diameter
+                )
+            ).cgPath
+        }
+
+        guard dots.first?.animation(forKey: "launchPulse") == nil else { return }
+        updateAnimations()
+    }
+
+    func setReduceMotion(_ reduceMotion: Bool) {
+        guard self.reduceMotion != reduceMotion else { return }
+        self.reduceMotion = reduceMotion
+        dots.forEach { $0.removeAllAnimations() }
+        updateAnimations()
+    }
+
+    private func updateAnimations() {
+        dots.forEach { $0.removeAllAnimations() }
+
+        guard !reduceMotion else {
+            dots.forEach { $0.opacity = 0.7 }
+            return
+        }
+
+        for (index, dot) in dots.enumerated() {
+            dot.opacity = 0.4
+
+            let opacity = CABasicAnimation(keyPath: "opacity")
+            opacity.fromValue = 0.4
+            opacity.toValue = 1.0
+
+            let scale = CABasicAnimation(keyPath: "transform.scale")
+            scale.fromValue = 0.65
+            scale.toValue = 1.0
+
+            let group = CAAnimationGroup()
+            group.animations = [opacity, scale]
+            group.duration = 0.72
+            group.beginTime = CACurrentMediaTime() + (Double(index) * 0.16)
+            group.autoreverses = true
+            group.repeatCount = .infinity
+            group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            group.isRemovedOnCompletion = false
+            dot.add(group, forKey: "launchPulse")
+        }
+    }
 }
 
 #Preview("Preparing Home") {

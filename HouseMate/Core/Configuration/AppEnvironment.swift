@@ -56,4 +56,28 @@ enum AppEnvironment: String {
             return "GoogleService-Info-Production"
         }
     }
+
+    var mixpanelToken: String? {
+        let key: String
+
+        switch self {
+        case .mock:
+            return nil
+        case .development:
+            key = "MixpanelTokenDevelopment"
+        case .production:
+            key = "MixpanelTokenProduction"
+        }
+
+        guard let token = Bundle.main.object(
+            forInfoDictionaryKey: key
+        ) as? String else {
+            return nil
+        }
+
+        let trimmedToken = token.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        return trimmedToken.isEmpty ? nil : trimmedToken
+    }
 }

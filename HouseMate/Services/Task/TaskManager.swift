@@ -9,12 +9,21 @@ import Foundation
 @MainActor
 final class TaskManager {
 
+    private let pageSize = 20
     private let service: any TaskServiceProtocol
     private let notificationService: any LocalNotificationServiceProtocol
     private var observation: ServiceObservation?
     private var currentUserID: String?
+    private var currentHouseholdID: String?
+    private var currentStartDate: Date?
+    private var currentEndDate: Date?
+    private var nextCursor: TaskPageCursor?
+    private var firstPageTasks: [TaskModel] = []
+    private var additionalTasks: [TaskModel] = []
 
     private(set) var tasks: [TaskModel] = []
+    private(set) var canLoadMore = false
+    private(set) var isLoadingMore = false
 
     init(service: any TaskServiceProtocol, notificationService: any LocalNotificationServiceProtocol) {
         self.service = service
@@ -23,6 +32,7 @@ final class TaskManager {
 
     func fetchTasks(householdID: String, currentUserID: String) async throws {
         self.currentUserID = currentUserID
+        currentHouseholdID = householdID
         let calendar = Calendar.autoupdatingCurrent
         let today = calendar.startOfDay(for: .now)
 
@@ -32,27 +42,72 @@ final class TaskManager {
         }
 
         observation?.cancel()
+        firstPageTasks = []
+        additionalTasks = []
+        nextCursor = nil
+        canLoadMore = false
 
-        if let observation = service.observeTasks(householdID: householdID, from: startDate, to: endDate, limit: 100, onChange: { [weak self] result in
+        currentStartDate = startDate
+        currentEndDate = endDate
+
+        if let observation = service.observeTasks(householdID: householdID, from: startDate, to: endDate, limit: pageSize, onChange: { [weak self] result in
             switch result {
             case .success(let tasks):
-                self?.tasks = tasks
-                self?.synchronizeNotifications()
+                self?.applyFirstPage(tasks)
             case .failure:
                 break
             }
         }) {
             self.observation = observation
         } else {
-            tasks = try await service.fetchTasks(householdID: householdID, from: startDate, to: endDate, limit: 100)
+            let page = try await service.fetchTasksPage(
+                householdID: householdID,
+                from: startDate,
+                to: endDate,
+                limit: pageSize,
+                after: nil
+            )
+            firstPageTasks = page.tasks
+            nextCursor = page.nextCursor
+            canLoadMore = page.tasks.count == pageSize && page.nextCursor != nil
+            mergePages()
             synchronizeNotifications()
         }
+    }
+
+    func loadMoreTasks() async throws {
+        guard !isLoadingMore,
+              canLoadMore,
+              let householdID = currentHouseholdID,
+              let startDate = currentStartDate,
+              let endDate = currentEndDate,
+              let cursor = nextCursor else { return }
+
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        let page = try await service.fetchTasksPage(
+            householdID: householdID,
+            from: startDate,
+            to: endDate,
+            limit: pageSize,
+            after: cursor
+        )
+
+        additionalTasks.append(contentsOf: page.tasks)
+        nextCursor = page.nextCursor
+        canLoadMore = page.tasks.count == pageSize && page.nextCursor != nil
+        mergePages()
+        synchronizeNotifications()
     }
 
     func createTask(_ task: TaskModel) async throws {
         try await service.createTask(task)
         if !tasks.contains(where: { $0.taskId == task.taskId }) {
             tasks.append(task)
+        }
+        if !firstPageTasks.contains(where: { $0.id == task.id }) {
+            firstPageTasks.append(task)
         }
         sortTasks()
 
@@ -73,6 +128,7 @@ final class TaskManager {
         }
 
         tasks[index].status = newStatus
+        updateCachedTask(tasks[index])
 
         if newStatus == .completed {
             notificationService.cancelTask(taskID: task.taskId)
@@ -88,6 +144,8 @@ final class TaskManager {
         )
 
         tasks.removeAll { $0.taskId == task.taskId }
+        firstPageTasks.removeAll { $0.id == task.id }
+        additionalTasks.removeAll { $0.id == task.id }
         notificationService.cancelTask(taskID: task.taskId)
     }
 
@@ -95,6 +153,14 @@ final class TaskManager {
         observation?.cancel()
         observation = nil
         currentUserID = nil
+        currentHouseholdID = nil
+        currentStartDate = nil
+        currentEndDate = nil
+        nextCursor = nil
+        firstPageTasks = []
+        additionalTasks = []
+        canLoadMore = false
+        isLoadingMore = false
         for task in tasks { notificationService.cancelTask(taskID: task.taskId) }
         tasks = []
     }
@@ -105,6 +171,37 @@ final class TaskManager {
 
     private func sortTasks() {
         tasks.sort { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+    }
+
+    private func applyFirstPage(_ fetchedTasks: [TaskModel]) {
+        firstPageTasks = fetchedTasks
+        nextCursor = fetchedTasks.last.flatMap { task in
+            task.dueDate.map { TaskPageCursor(dueDate: $0, documentID: task.id) }
+        }
+        canLoadMore = fetchedTasks.count == pageSize
+        mergePages()
+        synchronizeNotifications()
+    }
+
+    private func mergePages() {
+        var tasksByID: [String: TaskModel] = [:]
+        for task in firstPageTasks + additionalTasks {
+            tasksByID[task.id] = task
+        }
+        tasks = tasksByID.values.sorted {
+            let lhsDate = $0.dueDate ?? .distantFuture
+            let rhsDate = $1.dueDate ?? .distantFuture
+            return lhsDate == rhsDate ? $0.id < $1.id : lhsDate < rhsDate
+        }
+    }
+
+    private func updateCachedTask(_ task: TaskModel) {
+        if let index = firstPageTasks.firstIndex(where: { $0.id == task.id }) {
+            firstPageTasks[index] = task
+        }
+        if let index = additionalTasks.firstIndex(where: { $0.id == task.id }) {
+            additionalTasks[index] = task
+        }
     }
 
     private func synchronizeNotifications() {

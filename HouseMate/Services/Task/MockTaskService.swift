@@ -18,8 +18,14 @@ final class MockTaskService: TaskServiceProtocol {
         self.init(tasks: TaskModel.mockList)
     }
 
-    func fetchTasks(householdID: String, from startDate: Date, to endDate: Date, limit: Int) async throws -> [TaskModel] {
-        tasks
+    func fetchTasksPage(
+        householdID: String,
+        from startDate: Date,
+        to endDate: Date,
+        limit: Int,
+        after cursor: TaskPageCursor?
+    ) async throws -> TaskPage {
+        let matchingTasks = tasks
             .filter { task in
                 guard let dueDate = task.dueDate else {
                     return false
@@ -29,9 +35,24 @@ final class MockTaskService: TaskServiceProtocol {
                     && dueDate >= startDate
                     && dueDate < endDate
             }
-            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+            .sorted {
+                let lhsDate = $0.dueDate ?? .distantFuture
+                let rhsDate = $1.dueDate ?? .distantFuture
+                return lhsDate == rhsDate ? $0.id < $1.id : lhsDate < rhsDate
+            }
+            .filter { task in
+                guard let cursor, let dueDate = task.dueDate else { return true }
+                return dueDate > cursor.dueDate
+                    || (dueDate == cursor.dueDate && task.id > cursor.documentID)
+            }
             .prefix(limit)
             .map { $0 }
+
+        let nextCursor = matchingTasks.last.flatMap { task in
+            task.dueDate.map { TaskPageCursor(dueDate: $0, documentID: task.id) }
+        }
+
+        return TaskPage(tasks: matchingTasks, nextCursor: nextCursor)
     }
 
     func createTask(_ task: TaskModel) async throws {

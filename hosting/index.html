@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Join a home in HouseMate</title>
+    <style>
+      :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        color: #16233b;
+        background: linear-gradient(145deg, #dbeaff, #f3e5f7 55%, #e6f5ff);
+      }
+      main {
+        width: min(90vw, 440px);
+        padding: 36px 28px;
+        text-align: center;
+        border: 1px solid rgba(255,255,255,.8);
+        border-radius: 32px;
+        background: rgba(255,255,255,.55);
+        box-shadow: 0 24px 70px rgba(54,78,125,.16);
+        backdrop-filter: blur(24px);
+      }
+      .icon { font-size: 58px; }
+      h1 { margin: 16px 0 8px; font-size: 30px; }
+      p { margin: 0; color: rgba(22,35,59,.65); font-size: 17px; line-height: 1.45; }
+      .code { margin-top: 24px; font-size: 24px; font-weight: 750; letter-spacing: .12em; }
+      a {
+        display: block;
+        margin-top: 24px;
+        padding: 15px 20px;
+        color: white;
+        text-decoration: none;
+        font-weight: 650;
+        border-radius: 18px;
+        background: #168af5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="icon">🏠</div>
+      <h1>HouseMate invitation</h1>
+      <p>Open HouseMate to join this household. If the app is not installed yet, keep the invite code below.</p>
+      <div class="code" id="invite-code"></div>
+      <a id="open-app" href="housemate://join/">Open HouseMate</a>
+    </main>
+    <script>
+      const parts = location.pathname.split('/').filter(Boolean);
+      const code = parts[0] === 'join' && parts[1] ? parts[1].toUpperCase() : '';
+      document.getElementById('invite-code').textContent = code;
+      document.getElementById('open-app').href = `housemate://join/${encodeURIComponent(code)}`;
+    </script>
+  </body>
+</html>

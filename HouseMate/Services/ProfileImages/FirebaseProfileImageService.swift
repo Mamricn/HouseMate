@@ -32,6 +32,23 @@ final class FirebaseProfileImageService: ProfileImageServiceProtocol {
     }
 
     func deleteProfileImage(at url: URL) async throws {
+        guard isFirebaseStorageURL(url) else {
+            return
+        }
+
         try await storage.reference(forURL: url.absoluteString).delete()
+    }
+
+    private func isFirebaseStorageURL(_ url: URL) -> Bool {
+        if url.scheme == "gs" {
+            return true
+        }
+
+        guard let host = url.host?.lowercased() else {
+            return false
+        }
+
+        return host == "firebasestorage.googleapis.com"
+            && url.path.hasPrefix("/v0/b/")
     }
 }

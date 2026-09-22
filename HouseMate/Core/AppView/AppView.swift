@@ -12,22 +12,28 @@ import SwiftUI
 struct AppView: View {
 
     @State private var appState: AppState
-    @State private var showsAnimatedLaunch = true
+    @State private var deepLinkCoordinator = DeepLinkCoordinator.shared
     private let interactor: CoreInteractor
+    private let screenAnalyticsTracker: ScreenAnalyticsTracker
 
     init() {
+        StartupDiagnostics.mark("AppView init started")
         let container = DependencyContainer.make()
         let interactor = CoreInteractor(
             container: container
         )
 
         self.interactor = interactor
+        self.screenAnalyticsTracker = ScreenAnalyticsTracker(
+            logService: container.logService
+        )
 
         _appState = State(
             initialValue: AppState(
                 interactor: interactor
             )
         )
+        StartupDiagnostics.mark("AppView init finished")
     }
 
     init(
@@ -38,6 +44,9 @@ struct AppView: View {
         )
 
         self.interactor = interactor
+        self.screenAnalyticsTracker = ScreenAnalyticsTracker(
+            logService: container.logService
+        )
 
         _appState = State(
             initialValue: AppState(
@@ -47,31 +56,21 @@ struct AppView: View {
     }
 
     var body: some View {
-        ZStack {
-            screenContent
-
-            if showsAnimatedLaunch {
-                AnimatedLaunchView()
-                    .transition(.opacity)
-                    .zIndex(10)
-            }
-        }
+        screenContent
         .animation(
             .smooth,
             value: appState.route
         )
         .task {
+            // Let the first frame reach the display before auth/Firebase work starts.
+            await Task.yield()
+            StartupDiagnostics.mark("AppView bootstrap task started")
             await appState.bootstrap()
         }
-        .task {
-            try? await Task.sleep(for: .seconds(1.55))
-
-            guard !Task.isCancelled else { return }
-
-            withAnimation(.easeOut(duration: 0.35)) {
-                showsAnimatedLaunch = false
-            }
+        .onOpenURL { url in
+            deepLinkCoordinator.handle(url: url)
         }
+        .environment(\.screenAnalyticsTracker, screenAnalyticsTracker)
         .alert(
             "Something went wrong",
             isPresented: errorBinding
@@ -110,7 +109,9 @@ struct AppView: View {
                                 with: household
                             )
                         }
-                    )
+                    ),
+                    pendingDeepLink: deepLinkCoordinator.pending,
+                    onDeepLinkHandled: deepLinkCoordinator.consume
                 )
                 .transition(
                     .move(edge: .trailing)
@@ -134,7 +135,11 @@ struct AppView: View {
                     },
                     onHouseholdLeft: {
                         appState.completeHouseholdExit()
-                    }
+                    },
+                    onProfileImageChanged: { imageURL in
+                        appState.updateProfileImageURL(imageURL)
+                    },
+                    deepLinkCoordinator: deepLinkCoordinator
                 )
                 .transition(
                     .move(edge: .trailing)
@@ -162,6 +167,17 @@ struct AppView: View {
                 }
             }
         )
+    }
+}
+
+private extension AppRoute {
+    var analyticsName: String {
+        switch self {
+        case .loading: "preparing_home"
+        case .welcome: "welcome"
+        case .householdOnboarding: "household_onboarding"
+        case .main: "home"
+        }
     }
 }
 

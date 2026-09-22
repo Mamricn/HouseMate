@@ -83,6 +83,14 @@ struct ShoppingCollection: Identifiable, Codable, Equatable {
     var name: String
     var symbol: String
 
+    var eventParameters: [String: Any] {
+        [
+            "shopping_collection_id": id,
+            "shopping_collection_name": name,
+            "shopping_collection_symbol": symbol
+        ]
+    }
+
     static let groceries = ShoppingCollection(id: "groceries", name: "Groceries", symbol: "cart.fill")
 }
 

@@ -131,6 +131,23 @@ enum NotificationType: String, Codable, CaseIterable {
             return "person.badge.plus"
         }
     }
+
+    var defaultDestination: NotificationDestination {
+        switch self {
+        case .taskAssigned, .taskDue:
+            return .tasks
+        case .newBill, .billDue:
+            return .bills
+        case .newPoll:
+            return .polls
+        case .houseReminder:
+            return .reminders
+        case .newBoardPost:
+            return .household
+        case .householdInvitation:
+            return .housemates
+        }
+    }
 }
 
 // MARK: - Destination
@@ -138,6 +155,12 @@ enum NotificationType: String, Codable, CaseIterable {
 enum NotificationDestination: String, Codable {
     case household
     case housemates
+    case tasks
+    case shopping
+    case bills
+    case polls
+    case reminders
+    case documents
 }
 
 // MARK: - Mock Data
@@ -154,7 +177,7 @@ extension NotificationModel {
         message: "Clean bathroom is due at 10:00.",
         isRead: false,
         relatedEntityId: "task_3",
-        destination: .household
+        destination: .tasks
     )
 
     static let mockList: [NotificationModel] = [
@@ -168,7 +191,7 @@ extension NotificationModel {
             message: "Clean bathroom is due at 10:00.",
             isRead: false,
             relatedEntityId: "task_3",
-            destination: .household
+            destination: .tasks
         ),
 
         NotificationModel(
@@ -181,7 +204,7 @@ extension NotificationModel {
             message: "Adam asked: What should we order tonight?",
             isRead: false,
             relatedEntityId: "poll_1",
-            destination: .housemates
+            destination: .polls
         ),
 
         NotificationModel(
@@ -194,7 +217,7 @@ extension NotificationModel {
             message: "Electricity bill of £84.50 is due tomorrow.",
             isRead: false,
             relatedEntityId: "bill_1",
-            destination: .household
+            destination: .bills
         ),
 
         NotificationModel(
@@ -207,7 +230,7 @@ extension NotificationModel {
             message: "Put the blue bin outside tomorrow.",
             isRead: true,
             relatedEntityId: "reminder_2",
-            destination: .housemates
+            destination: .reminders
         ),
 
         NotificationModel(
@@ -220,7 +243,7 @@ extension NotificationModel {
             message: "Adam assigned Do laundry to you.",
             isRead: true,
             relatedEntityId: "task_4",
-            destination: .household
+            destination: .tasks
         ),
 
         NotificationModel(

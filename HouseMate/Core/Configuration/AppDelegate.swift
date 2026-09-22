@@ -7,6 +7,7 @@
 
 
 import UIKit
+import FirebaseAppCheck
 import FirebaseCore
 import FirebaseMessaging
 import UserNotifications
@@ -20,13 +21,25 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         ]? = nil
     ) -> Bool {
 
+        StartupDiagnostics.mark("didFinishLaunching started")
+        let firebaseStartedAt = StartupDiagnostics.begin("Firebase configure")
         configureFirebase()
+        StartupDiagnostics.end(
+            "Firebase configure",
+            startedAt: firebaseStartedAt
+        )
+        StartupDiagnostics.mark(
+            "Environment: \(AppEnvironment.current.rawValue), "
+                + "Firebase project: "
+                + (FirebaseApp.app()?.options.projectID ?? "missing")
+        )
         UNUserNotificationCenter.current().delegate = self
 
         if AppEnvironment.current.usesFirebase {
             Messaging.messaging().delegate = self
         }
 
+        StartupDiagnostics.mark("didFinishLaunching finished")
         return true
     }
 
@@ -34,6 +47,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         guard AppEnvironment.current.usesFirebase else {
             return
         }
+
+        configureAppCheck()
 
         guard let fileName =
                 AppEnvironment.current.firebaseConfigurationFileName,
@@ -52,6 +67,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
 
         FirebaseApp.configure(options: options)
+    }
+
+    private func configureAppCheck() {
+#if DEBUG
+        AppCheck.setAppCheckProviderFactory(
+            AppCheckDebugProviderFactory()
+        )
+#else
+        AppCheck.setAppCheckProviderFactory(
+            AppAttestProviderFactory()
+        )
+#endif
     }
 }
 
@@ -109,6 +136,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         let userInfo = response.notification.request.content.userInfo
 
         await MainActor.run {
+            DeepLinkCoordinator.shared.handle(
+                notificationUserInfo: userInfo
+            )
             NotificationCenter.default.post(
                 name: .houseMateNotificationOpened,
                 object: nil,

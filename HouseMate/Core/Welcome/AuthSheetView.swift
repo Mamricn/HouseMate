@@ -80,6 +80,7 @@ struct AuthSheetView: View {
                 alignment: .top
             )
         }
+        .screenAppearAnalytics(name: "AuthSheetView")
     }
 
     private var background: some View {

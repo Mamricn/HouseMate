@@ -1,0 +1,18 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "ZWN2ZLM4P5.com.Mar-cin.HouseMate.dev",
+          "ZWN2ZLM4P5.com.Mar-cin.HouseMate"
+        ],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "HouseMate household invitation links"
+          }
+        ]
+      }
+    ]
+  }
+}

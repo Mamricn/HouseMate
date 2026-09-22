@@ -34,19 +34,43 @@ final class SelectViewModel {
         )
     }
 
-    func makeJoinHomeViewModel() -> JoinHomeViewModel {
+    func makeJoinHomeViewModel(inviteCode: String = "") -> JoinHomeViewModel {
         JoinHomeViewModel(
             interactor: interactor,
             user: user,
+            inviteCode: inviteCode,
             onHouseholdJoined: onHouseholdCompleted
         )
     }
+
 }
 
 struct SelectView: View {
 
     @State var viewModel: SelectViewModel
-    @State private var path: [OnboardingDestination] = []
+    let pendingDeepLink: AppDeepLink?
+    var onDeepLinkHandled: (AppDeepLink) -> Void
+
+    @State private var path: [OnboardingDestination]
+    @State private var pendingInviteCode: String
+
+    init(
+        viewModel: SelectViewModel,
+        pendingDeepLink: AppDeepLink? = nil,
+        onDeepLinkHandled: @escaping (AppDeepLink) -> Void = { _ in }
+    ) {
+        self.viewModel = viewModel
+        self.pendingDeepLink = pendingDeepLink
+        self.onDeepLinkHandled = onDeepLinkHandled
+
+        if case let .joinHousehold(inviteCode) = pendingDeepLink {
+            _path = State(initialValue: [.joinHome])
+            _pendingInviteCode = State(initialValue: inviteCode)
+        } else {
+            _path = State(initialValue: [])
+            _pendingInviteCode = State(initialValue: "")
+        }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -65,6 +89,13 @@ struct SelectView: View {
                 destinationView(destination)
             }
         }
+        .onAppear {
+            if case .joinHousehold = pendingDeepLink,
+               let pendingDeepLink {
+                onDeepLinkHandled(pendingDeepLink)
+            }
+        }
+        .screenAppearAnalytics(name: "SelectView")
     }
 
     private var background: some View {
@@ -153,7 +184,11 @@ struct SelectView: View {
             CreateHomeView(viewModel: viewModel.makeCreateHomeViewModel())
 
         case .joinHome:
-            JoinHomeView(viewModel: viewModel.makeJoinHomeViewModel())
+            JoinHomeView(
+                viewModel: viewModel.makeJoinHomeViewModel(
+                    inviteCode: pendingInviteCode
+                )
+            )
         }
     }
 }

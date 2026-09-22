@@ -16,32 +16,71 @@ final class ProfileSettingsViewModel {
     }
 
     func uploadImage(data: Data) async -> String? {
-        var uploadedURL: String?
-
-        let didUpload = await actionState.perform {
-            uploadedURL = try await interactor.uploadProfileImage(
-                data: data,
-                for: user
-            )
+        interactor.trackEvent(Event.uploadImageStart)
+        do {
+            var uploadedURL: String?
+            try await actionState.run {
+                uploadedURL = try await interactor.uploadProfileImage(data: data, for: user)
+            }
+            guard let uploadedURL else { return nil }
+            user.profileImageUrl = uploadedURL
+            interactor.trackEvent(Event.uploadImageSuccess(imageURL: uploadedURL))
+            return uploadedURL
+        } catch {
+            interactor.trackEvent(Event.uploadImageFail(error: error))
+            return nil
         }
-
-        guard didUpload, let uploadedURL else { return nil }
-        user.profileImageUrl = uploadedURL
-        return uploadedURL
     }
 
     func removeImage() async -> Bool {
         guard user.profileImageUrl != nil else { return false }
 
-        let didRemove = await actionState.perform {
-            try await interactor.removeProfileImage(for: user)
-        }
+        interactor.trackEvent(Event.removeImageStart)
 
-        if didRemove {
+        do {
+            try await actionState.run { try await interactor.removeProfileImage(for: user) }
             user.profileImageUrl = nil
+            interactor.trackEvent(Event.removeImageSuccess)
+            return true
+        } catch {
+            interactor.trackEvent(Event.removeImageFail(error: error))
+            return false
+        }
+    }
+
+    enum Event: LoggableEvent {
+        case uploadImageStart
+        case uploadImageSuccess(imageURL: String)
+        case uploadImageFail(error: Error)
+        case removeImageStart
+        case removeImageSuccess
+        case removeImageFail(error: Error)
+
+        var eventName: String {
+            switch self {
+            case .uploadImageStart: "ProfileSettingsView_UploadImage_Start"
+            case .uploadImageSuccess: "ProfileSettingsView_UploadImage_Success"
+            case .uploadImageFail: "ProfileSettingsView_UploadImage_Fail"
+            case .removeImageStart: "ProfileSettingsView_RemoveImage_Start"
+            case .removeImageSuccess: "ProfileSettingsView_RemoveImage_Success"
+            case .removeImageFail: "ProfileSettingsView_RemoveImage_Fail"
+            }
         }
 
-        return didRemove
+        var parameters: [String: Any]? {
+            switch self {
+            case .uploadImageSuccess(let imageURL): ["profile_image_url": imageURL]
+            case .uploadImageFail(let error), .removeImageFail(let error): error.eventParameters
+            default: nil
+            }
+        }
+
+        var type: LogType {
+            switch self {
+            case .uploadImageFail, .removeImageFail: .severe
+            default: .analytic
+            }
+        }
     }
 }
 
@@ -77,6 +116,7 @@ struct ProfileSettingsView: View {
         }
         .navigationTitle("Profile Photo")
         .navigationBarTitleDisplayMode(.inline)
+        .screenAppearAnalytics(name: "ProfileSettingsView")
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
             prepareForCropping(item)

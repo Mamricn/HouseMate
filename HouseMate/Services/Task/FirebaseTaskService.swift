@@ -15,19 +15,39 @@ final class FirebaseTaskService: TaskServiceProtocol {
         self.database = database
     }
 
-    func fetchTasks(householdID: String, from startDate: Date, to endDate: Date, limit: Int) async throws -> [TaskModel] {
-        let snapshot = try await tasksCollection(householdID: householdID)
+    func fetchTasksPage(
+        householdID: String,
+        from startDate: Date,
+        to endDate: Date,
+        limit: Int,
+        after cursor: TaskPageCursor?
+    ) async throws -> TaskPage {
+        var query: Query = tasksCollection(householdID: householdID)
             .whereField("due_date", isGreaterThanOrEqualTo: startDate)
             .whereField("due_date", isLessThan: endDate)
             .order(by: "due_date")
+            .order(by: FieldPath.documentID())
+
+        if let cursor {
+            query = query.start(after: [cursor.dueDate, cursor.documentID])
+        }
+
+        let snapshot = try await query
             .limit(to: limit)
             .getDocuments()
 
-        return try snapshot.documents
+        let tasks = try snapshot.documents
             .map { document in
                 try Firestore.Decoder().decode(TaskModel.self, from: document.data())
             }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+
+        let nextCursor = snapshot.documents.last.flatMap { document -> TaskPageCursor? in
+            guard let dueDate = document.get("due_date") as? Timestamp else { return nil }
+            return TaskPageCursor(dueDate: dueDate.dateValue(), documentID: document.documentID)
+        }
+
+        return TaskPage(tasks: tasks, nextCursor: nextCursor)
     }
 
     func observeTasks(householdID: String, from startDate: Date, to endDate: Date, limit: Int, onChange: @escaping (Result<[TaskModel], Error>) -> Void) -> ServiceObservation? {
@@ -35,6 +55,7 @@ final class FirebaseTaskService: TaskServiceProtocol {
             .whereField("due_date", isGreaterThanOrEqualTo: startDate)
             .whereField("due_date", isLessThan: endDate)
             .order(by: "due_date")
+            .order(by: FieldPath.documentID())
             .limit(to: limit)
             .addSnapshotListener { snapshot, error in
                 if let error {

@@ -30,10 +30,16 @@ final class JoinHomeViewModel {
         hasValidInviteCode && !isLoading
     }
 
-    init(interactor: CoreInteractor, user: UserModel, onHouseholdJoined: @escaping (HouseholdModel) -> Void) {
+    init(
+        interactor: CoreInteractor,
+        user: UserModel,
+        inviteCode: String = "",
+        onHouseholdJoined: @escaping (HouseholdModel) -> Void
+    ) {
         self.interactor = interactor
         self.user = user
         self.onHouseholdJoined = onHouseholdJoined
+        updateInviteCode(inviteCode)
     }
 
     func updateInviteCode(_ value: String) {
@@ -47,20 +53,51 @@ final class JoinHomeViewModel {
     func joinHome() async {
         guard canJoinHome else { return }
 
+        interactor.trackEvent(Event.joinHomeStart)
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
             let household = try await interactor.joinHousehold(inviteCode: inviteCode, user: user)
+            interactor.trackEvent(Event.joinHomeSuccess(household: household))
             onHouseholdJoined(household)
         } catch {
+            interactor.trackEvent(Event.joinHomeFail(error: error))
             errorMessage = error.localizedDescription
         }
     }
 
     func clearError() {
         errorMessage = nil
+    }
+
+    enum Event: LoggableEvent {
+        case joinHomeStart
+        case joinHomeSuccess(household: HouseholdModel)
+        case joinHomeFail(error: Error)
+
+        var eventName: String {
+            switch self {
+            case .joinHomeStart: "JoinHomeView_JoinHome_Start"
+            case .joinHomeSuccess: "JoinHomeView_JoinHome_Success"
+            case .joinHomeFail: "JoinHomeView_JoinHome_Fail"
+            }
+        }
+
+        var parameters: [String: Any]? {
+            switch self {
+            case .joinHomeSuccess(let household): household.eventParameters
+            case .joinHomeFail(let error): error.eventParameters
+            default: nil
+            }
+        }
+
+        var type: LogType {
+            if case .joinHomeFail = self { return .severe }
+            return .analytic
+        }
     }
 }
 
@@ -97,6 +134,7 @@ struct JoinHomeView: View {
         .onAppear {
             isCodeFocused = true
         }
+        .screenAppearAnalytics(name: "JoinHomeView")
         .alert("Couldn't join home", isPresented: errorBinding) {
             Button("OK") {
                 viewModel.clearError()

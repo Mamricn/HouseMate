@@ -37,20 +37,51 @@ final class CreateHomeViewModel {
     func createHome() async {
         guard canCreateHome else { return }
 
+        interactor.trackEvent(Event.createHomeStart)
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
             let household = try await interactor.createHousehold(name: homeName, owner: user)
+            interactor.trackEvent(Event.createHomeSuccess(household: household))
             onHouseholdCreated(household)
         } catch {
+            interactor.trackEvent(Event.createHomeFail(error: error))
             errorMessage = error.localizedDescription
         }
     }
 
     func clearError() {
         errorMessage = nil
+    }
+
+    enum Event: LoggableEvent {
+        case createHomeStart
+        case createHomeSuccess(household: HouseholdModel)
+        case createHomeFail(error: Error)
+
+        var eventName: String {
+            switch self {
+            case .createHomeStart: "CreateHomeView_CreateHome_Start"
+            case .createHomeSuccess: "CreateHomeView_CreateHome_Success"
+            case .createHomeFail: "CreateHomeView_CreateHome_Fail"
+            }
+        }
+
+        var parameters: [String: Any]? {
+            switch self {
+            case .createHomeSuccess(let household): household.eventParameters
+            case .createHomeFail(let error): error.eventParameters
+            default: nil
+            }
+        }
+
+        var type: LogType {
+            if case .createHomeFail = self { return .severe }
+            return .analytic
+        }
     }
 }
 
@@ -79,6 +110,7 @@ struct CreateHomeView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .screenAppearAnalytics(name: "CreateHomeView")
         .alert("Couldn't create home", isPresented: errorBinding) {
             Button("OK") {
                 viewModel.clearError()

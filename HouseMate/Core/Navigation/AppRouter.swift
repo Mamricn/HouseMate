@@ -12,7 +12,12 @@ final class AppRouter {
 
     var path = NavigationPath()
 
-    func navigate(to route: MainRoute) {
+    func navigate(
+        to route: MainRoute,
+        trackInteraction: Bool = true
+    ) {
+        if trackInteraction {
+        }
         path.append(route)
     }
 

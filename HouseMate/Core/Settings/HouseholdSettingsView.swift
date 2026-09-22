@@ -48,12 +48,13 @@ final class HouseholdSettingsViewModel {
             return false
         }
 
-        return await actionState.perform {
-            try await interactor.removeHouseholdMember(
-                userID: member.userId,
-                requestedByUserID: currentUser.id
-            )
-        }
+        interactor.trackEvent(Event.removeMemberStart(member: member))
+        do {
+            try await actionState.run {
+                try await interactor.removeHouseholdMember(userID: member.userId, requestedByUserID: currentUser.id)
+            }
+            interactor.trackEvent(Event.removeMemberSuccess(member: member)); return true
+        } catch { interactor.trackEvent(Event.removeMemberFail(error: error, member: member)); return false }
     }
 
     func transferOwnership(
@@ -65,18 +66,16 @@ final class HouseholdSettingsViewModel {
             return false
         }
 
-        let didTransfer = await actionState.perform {
-            try await interactor.transferHouseholdOwnership(
-                to: member.userId,
-                requestedByUserID: currentUser.id
-            )
-        }
-
-        if didTransfer {
+        interactor.trackEvent(Event.transferOwnershipStart(member: member))
+        do {
+            try await actionState.run {
+                try await interactor.transferHouseholdOwnership(to: member.userId, requestedByUserID: currentUser.id)
+            }
             household.ownerUserId = member.userId
+            interactor.trackEvent(Event.transferOwnershipSuccess(member: member)); return true
+        } catch {
+            interactor.trackEvent(Event.transferOwnershipFail(error: error, member: member)); return false
         }
-
-        return didTransfer
     }
 
     func leaveHousehold() async -> Bool {
@@ -84,11 +83,11 @@ final class HouseholdSettingsViewModel {
             return false
         }
 
-        return await actionState.perform {
-            try await interactor.leaveHousehold(
-                userID: currentUser.id
-            )
-        }
+        interactor.trackEvent(Event.leaveHouseholdStart)
+        do {
+            try await actionState.run { try await interactor.leaveHousehold(userID: currentUser.id) }
+            interactor.trackEvent(Event.leaveHouseholdSuccess); return true
+        } catch { interactor.trackEvent(Event.leaveHouseholdFail(error: error)); return false }
     }
 
     func deleteHousehold() async -> Bool {
@@ -96,10 +95,69 @@ final class HouseholdSettingsViewModel {
             return false
         }
 
-        return await actionState.perform {
-            try await interactor.deleteHousehold(
-                requestedByUserID: currentUser.id
-            )
+        interactor.trackEvent(Event.deleteHouseholdStart(household: household))
+        do {
+            try await actionState.run { try await interactor.deleteHousehold(requestedByUserID: currentUser.id) }
+            interactor.trackEvent(Event.deleteHouseholdSuccess(household: household)); return true
+        } catch { interactor.trackEvent(Event.deleteHouseholdFail(error: error, household: household)); return false }
+    }
+
+    enum Event: LoggableEvent {
+        case removeMemberStart(member: HouseholdMemberModel)
+        case removeMemberSuccess(member: HouseholdMemberModel)
+        case removeMemberFail(error: Error, member: HouseholdMemberModel)
+        case transferOwnershipStart(member: HouseholdMemberModel)
+        case transferOwnershipSuccess(member: HouseholdMemberModel)
+        case transferOwnershipFail(error: Error, member: HouseholdMemberModel)
+        case leaveHouseholdStart
+        case leaveHouseholdSuccess
+        case leaveHouseholdFail(error: Error)
+        case deleteHouseholdStart(household: HouseholdModel)
+        case deleteHouseholdSuccess(household: HouseholdModel)
+        case deleteHouseholdFail(error: Error, household: HouseholdModel)
+
+        var eventName: String {
+            switch self {
+            case .removeMemberStart: "HouseholdSettingsView_RemoveMember_Start"
+            case .removeMemberSuccess: "HouseholdSettingsView_RemoveMember_Success"
+            case .removeMemberFail: "HouseholdSettingsView_RemoveMember_Fail"
+            case .transferOwnershipStart: "HouseholdSettingsView_TransferOwnership_Start"
+            case .transferOwnershipSuccess: "HouseholdSettingsView_TransferOwnership_Success"
+            case .transferOwnershipFail: "HouseholdSettingsView_TransferOwnership_Fail"
+            case .leaveHouseholdStart: "HouseholdSettingsView_LeaveHousehold_Start"
+            case .leaveHouseholdSuccess: "HouseholdSettingsView_LeaveHousehold_Success"
+            case .leaveHouseholdFail: "HouseholdSettingsView_LeaveHousehold_Fail"
+            case .deleteHouseholdStart: "HouseholdSettingsView_DeleteHousehold_Start"
+            case .deleteHouseholdSuccess: "HouseholdSettingsView_DeleteHousehold_Success"
+            case .deleteHouseholdFail: "HouseholdSettingsView_DeleteHousehold_Fail"
+            }
+        }
+
+        var parameters: [String: Any]? {
+            switch self {
+            case .removeMemberStart(let member), .removeMemberSuccess(let member),
+                 .transferOwnershipStart(let member), .transferOwnershipSuccess(let member):
+                member.eventParameters
+            case .removeMemberFail(let error, let member),
+                 .transferOwnershipFail(let error, let member):
+                member.eventParameters.merging(error.eventParameters) { current, _ in current }
+            case .leaveHouseholdFail(let error):
+                error.eventParameters
+            case .deleteHouseholdStart(let household), .deleteHouseholdSuccess(let household):
+                household.eventParameters
+            case .deleteHouseholdFail(let error, let household):
+                household.eventParameters.merging(error.eventParameters) { current, _ in current }
+            default:
+                nil
+            }
+        }
+
+        var type: LogType {
+            switch self {
+            case .removeMemberFail, .transferOwnershipFail,
+                 .leaveHouseholdFail, .deleteHouseholdFail: .severe
+            default: .analytic
+            }
         }
     }
 }
@@ -150,6 +208,7 @@ struct HouseholdSettingsView: View {
         }
         .navigationTitle("Household")
         .navigationBarTitleDisplayMode(.inline)
+        .screenAppearAnalytics(name: "HouseholdSettingsView")
         .sheet(isPresented: $showsOwnershipPicker) {
             ownershipPicker
                 .presentationDetents([.medium])
@@ -639,7 +698,7 @@ struct HouseholdSettingsView: View {
     }
 
     private var inviteMessage: String {
-        "Join \(viewModel.household.name) on HouseMate using invite code \(viewModel.household.inviteCode)."
+        "Join \(viewModel.household.name) on HouseMate: https://housemate-5fbc5.web.app/join/\(viewModel.household.inviteCode) (invite code: \(viewModel.household.inviteCode))."
     }
 
     private var errorBinding: Binding<Bool> {

@@ -82,17 +82,31 @@ final class HouseholdManager {
 
     @discardableResult
     func fetchHousehold(householdID: String) async throws -> HouseholdModel? {
+        let householdStartedAt = StartupDiagnostics.begin(
+            "Firestore household document"
+        )
         let household = try await householdService
             .fetchHousehold(
                 householdID: householdID
             )
+        StartupDiagnostics.end(
+            "Firestore household document",
+            startedAt: householdStartedAt
+        )
 
         currentHousehold = household
 
         if household != nil {
             startObservingMembers(householdID: householdID)
+            let membersStartedAt = StartupDiagnostics.begin(
+                "Firestore household members"
+            )
             currentMembers = try await householdService.fetchMembers(
                 householdID: householdID
+            )
+            StartupDiagnostics.end(
+                "Firestore household members",
+                startedAt: membersStartedAt
             )
         } else {
             membersObservation?.cancel()
@@ -108,6 +122,14 @@ final class HouseholdManager {
         membersObservation = nil
         currentHousehold = nil
         currentMembers = []
+    }
+
+    func restoreCachedHousehold(
+        _ household: HouseholdModel,
+        members: [HouseholdMemberModel]
+    ) {
+        currentHousehold = household
+        currentMembers = members
     }
 
     func updateAutomaticWeeklyAssignment(

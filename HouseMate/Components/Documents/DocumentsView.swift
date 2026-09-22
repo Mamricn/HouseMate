@@ -34,7 +34,9 @@ struct DocumentsView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: onAdd) { Image(systemName: "plus") }
+                Button {
+                    onAdd()
+                } label: { Image(systemName: "plus") }
                     .accessibilityLabel("Add document")
             }
         }
@@ -80,7 +82,9 @@ struct DocumentsView: View {
                 HouseMateSwipeRow(leadingAction: deleteAction(document), trailingAction: nil) {
                     documentRow(document)
                         .contentShape(Rectangle())
-                        .onTapGesture { selectedDocument = document }
+                        .onTapGesture {
+                            selectedDocument = document
+                        }
                         .padding(.vertical, 10)
                 }
                 if index < filteredDocuments.count - 1 { Divider().padding(.leading, 58) }
@@ -154,7 +158,9 @@ struct DocumentsView: View {
             .toolbar {
                 if canDelete(document) {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Edit") { editingDocument = document }
+                        Button("Edit") {
+                            editingDocument = document
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { selectedDocument = nil } }

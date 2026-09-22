@@ -38,6 +38,28 @@ struct HouseholdDocumentModel: Identifiable, Codable, Equatable {
         case warrantyExpiresAt = "warranty_expires_at"
         case serialNumber = "serial_number"
     }
+
+    var eventParameters: [String: Any] {
+        let dictionary: [String: Any?] = [
+            "document_\(CodingKeys.documentId.rawValue)": documentId,
+            "document_\(CodingKeys.householdId.rawValue)": householdId,
+            "document_\(CodingKeys.createdAt.rawValue)": createdAt,
+            "document_\(CodingKeys.createdByUserId.rawValue)": createdByUserId,
+            "document_\(CodingKeys.title.rawValue)": title,
+            "document_\(CodingKeys.category.rawValue)": category.rawValue,
+            "document_\(CodingKeys.notes.rawValue)": notes,
+            "document_\(CodingKeys.fileName.rawValue)": fileName,
+            "document_\(CodingKeys.fileURL.rawValue)": fileURL,
+            "document_\(CodingKeys.storagePath.rawValue)": storagePath,
+            "document_\(CodingKeys.contentType.rawValue)": contentType,
+            "document_\(CodingKeys.storeName.rawValue)": storeName,
+            "document_\(CodingKeys.amount.rawValue)": amount,
+            "document_\(CodingKeys.purchaseDate.rawValue)": purchaseDate,
+            "document_\(CodingKeys.warrantyExpiresAt.rawValue)": warrantyExpiresAt,
+            "document_\(CodingKeys.serialNumber.rawValue)": serialNumber
+        ]
+        return dictionary.compactMapValues { $0 }
+    }
 }
 
 enum HouseholdDocumentCategory: String, Codable, CaseIterable, Identifiable {
@@ -92,6 +114,14 @@ struct DocumentAttachmentDraft: Equatable {
     let data: Data
     let fileName: String
     let contentType: String
+
+    var eventParameters: [String: Any] {
+        [
+            "attachment_file_name": fileName,
+            "attachment_content_type": contentType,
+            "attachment_size_bytes": data.count
+        ]
+    }
 }
 
 extension HouseholdDocumentModel {

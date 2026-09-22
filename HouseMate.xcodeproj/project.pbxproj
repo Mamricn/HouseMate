@@ -13,6 +13,9 @@
 		EB045987303DFAE80001EDB2 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EB045986303DFAE80001EDB2 /* GoogleSignInSwift */; };
 		EB045989303DAEC90001EDB2 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = EB045988303DAEC90001EDB2 /* FirebaseStorage */; };
 		EB04598B303DAEC90001EDB2 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = EB04598A303DAEC90001EDB2 /* FirebaseMessaging */; };
+		EB7A10013054A00100A11A11 /* Mixpanel in Frameworks */ = {isa = PBXBuildFile; productRef = EB7A10033054A00100A11A11 /* Mixpanel */; };
+		EB7A10103054B00100A11A11 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = EB7A10113054B00100A11A11 /* FirebaseCrashlytics */; };
+		EB7A10203054C00100A11A11 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = EB7A10213054C00100A11A11 /* FirebaseAppCheck */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +77,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EB7A10203054C00100A11A11 /* FirebaseAppCheck in Frameworks */,
+				EB7A10103054B00100A11A11 /* FirebaseCrashlytics in Frameworks */,
+				EB7A10013054A00100A11A11 /* Mixpanel in Frameworks */,
 				EB04597B303DAEC90001EDB2 /* FirebaseAuth in Frameworks */,
 				EB04597D303DAEC90001EDB2 /* FirebaseFirestore in Frameworks */,
 				EB045989303DAEC90001EDB2 /* FirebaseStorage in Frameworks */,
@@ -130,6 +136,7 @@
 				EB667BD930338A8D00B6611A /* Sources */,
 				EB667BDA30338A8D00B6611A /* Frameworks */,
 				EB667BDB30338A8D00B6611A /* Resources */,
+				EB7A10123054B00100A11A11 /* Upload Crashlytics Symbols */,
 			);
 			buildRules = (
 			);
@@ -140,6 +147,9 @@
 			);
 			name = HouseMate;
 			packageProductDependencies = (
+				EB7A10213054C00100A11A11 /* FirebaseAppCheck */,
+				EB7A10113054B00100A11A11 /* FirebaseCrashlytics */,
+				EB7A10033054A00100A11A11 /* Mixpanel */,
 				EB04597A303DAEC90001EDB2 /* FirebaseAuth */,
 				EB04597C303DAEC90001EDB2 /* FirebaseFirestore */,
 				EB045988303DAEC90001EDB2 /* FirebaseStorage */,
@@ -230,6 +240,7 @@
 			mainGroup = EB667BD430338A8D00B6611A;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				EB7A10023054A00100A11A11 /* XCRemoteSwiftPackageReference "mixpanel-swift" */,
 				EB045979303DAEC90001EDB2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				EB045983303DFAE80001EDB2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
@@ -268,6 +279,31 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		EB7A10123054B00100A11A11 /* Upload Crashlytics Symbols */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}.debug.dylib",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+				"$(PROJECT_DIR)/HouseMate/Core/Configuration/GoogleService-Info-Development.plist",
+				"$(PROJECT_DIR)/HouseMate/Core/Configuration/GoogleService-Info-Production.plist",
+			);
+			name = "Upload Crashlytics Symbols";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [[ \"$CONFIGURATION\" == *Development* ]]; then\n  GSP_PATH=\"$PROJECT_DIR/HouseMate/Core/Configuration/GoogleService-Info-Development.plist\"\nelse\n  GSP_PATH=\"$PROJECT_DIR/HouseMate/Core/Configuration/GoogleService-Info-Production.plist\"\nfi\n\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\" -gsp \"$GSP_PATH\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		EB667BD930338A8D00B6611A /* Sources */ = {
@@ -341,7 +377,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -384,6 +420,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				GOOGLE_REVERSED_CLIENT_ID = "housemate-mock";
 				INFOPLIST_FILE = HouseMate/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "HouseMate-mock";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -520,6 +557,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				GOOGLE_REVERSED_CLIENT_ID = "housemate-mock";
 				INFOPLIST_FILE = HouseMate/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "HouseMate-mock";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -620,7 +658,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -663,6 +701,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.1018275940291-a0dgveijnagl4oqp8i4thpsrubsleg5l";
 				INFOPLIST_FILE = HouseMate/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "HouseMate-prod";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -799,6 +838,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.349801707175-enarnl6lq1mr24vgf5s145v0ei2kin9v";
 				INFOPLIST_FILE = HouseMate/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "HouseMate-dev";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -899,7 +939,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = ZWN2ZLM4P5;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -999,6 +1039,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.349801707175-enarnl6lq1mr24vgf5s145v0ei2kin9v";
 				INFOPLIST_FILE = HouseMate/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "HouseMate-dev";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -1036,6 +1077,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.1018275940291-a0dgveijnagl4oqp8i4thpsrubsleg5l";
 				INFOPLIST_FILE = HouseMate/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "HouseMate-prod";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -1218,6 +1260,14 @@
 				minimumVersion = 9.2.0;
 			};
 		};
+		EB7A10023054A00100A11A11 /* XCRemoteSwiftPackageReference "mixpanel-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mixpanel/mixpanel-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.5.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1250,6 +1300,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EB045979303DAEC90001EDB2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
+		};
+		EB7A10033054A00100A11A11 /* Mixpanel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EB7A10023054A00100A11A11 /* XCRemoteSwiftPackageReference "mixpanel-swift" */;
+			productName = Mixpanel;
+		};
+		EB7A10113054B00100A11A11 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EB045979303DAEC90001EDB2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		EB7A10213054C00100A11A11 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EB045979303DAEC90001EDB2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

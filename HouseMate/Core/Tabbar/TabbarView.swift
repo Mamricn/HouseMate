@@ -13,9 +13,11 @@ struct TabbarView: View {
 
     private let interactor: CoreInteractor
     private let household: HouseholdModel
+    private let deepLinkCoordinator: DeepLinkCoordinator
 
     var onSignOut: () -> Void = {}
     var onHouseholdLeft: () -> Void = {}
+    var onProfileImageChanged: (String?) -> Void = { _ in }
 
     @State private var activeTab: CustomTab = .home
     @State private var router = AppRouter()
@@ -39,12 +41,17 @@ struct TabbarView: View {
         members: [HouseholdMemberModel],
         interactor: CoreInteractor,
         onSignOut: @escaping () -> Void = {},
-        onHouseholdLeft: @escaping () -> Void = {}
+        onHouseholdLeft: @escaping () -> Void = {},
+        onProfileImageChanged: @escaping (String?) -> Void = { _ in },
+        deepLinkCoordinator: DeepLinkCoordinator
     ) {
+        StartupDiagnostics.mark("TabbarView init started")
         self.interactor = interactor
         self.household = household
+        self.deepLinkCoordinator = deepLinkCoordinator
         self.onSignOut = onSignOut
         self.onHouseholdLeft = onHouseholdLeft
+        self.onProfileImageChanged = onProfileImageChanged
 
         let householdUsers = members.map { member in
             UserModel(
@@ -88,6 +95,7 @@ struct TabbarView: View {
                 interactor: interactor
             )
         )
+        StartupDiagnostics.mark("TabbarView init finished")
     }
 
     init() {
@@ -98,7 +106,8 @@ struct TabbarView: View {
             user: UserModel.mockList[0],
             household: .mock,
             members: HouseholdMemberModel.mockList,
-            interactor: interactor
+            interactor: interactor,
+            deepLinkCoordinator: .shared
         )
     }
 
@@ -159,6 +168,7 @@ struct TabbarView: View {
                         tasks: householdViewModel.tasks,
                         bills: householdViewModel.bills,
                         reminders: householdViewModel.reminders,
+                        canLoadMoreTasks: householdViewModel.canLoadMoreTasks,
                         selectedDate: $calendarSelectedDate,
                         onOpenTasks: {
                             router.navigate(to: .householdCleaning)
@@ -169,10 +179,17 @@ struct TabbarView: View {
                         onOpenReminders: {
                             router.navigate(to: .householdReminders(UUID()))
                         },
+                        onEnsureTaskCount: { date, count in
+                            await householdViewModel.ensureTasksLoaded(
+                                for: date,
+                                minimumCount: count
+                            )
+                        },
                         onRefresh: {
                             await householdViewModel.refreshData()
                         }
                     )
+                    .screenAppearAnalytics(name: "CalendarView")
                     .customTabBarSafeArea()
                 }
             }
@@ -191,6 +208,7 @@ struct TabbarView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             sheetContent(for: sheet)
+                .screenAppearAnalytics(name: sheet.analyticsScreenName)
         }
         .overlay(alignment: .top) {
             if let toast {
@@ -201,22 +219,45 @@ struct TabbarView: View {
                     .allowsHitTesting(false)
             }
         }
+        .onAppear {
+            StartupDiagnostics.mark("TabbarView visible")
+            openPendingDeepLink()
+        }
+        .onChange(of: deepLinkCoordinator.pending) { _, _ in
+            openPendingDeepLink()
+        }
         .task {
-            await notificationsViewModel.fetchNotifications()
-            await householdViewModel.refreshData()
-            await housematesViewModel.refreshData()
+            // Home only needs these four lightweight data sources. Polls,
+            // documents, board posts and notifications load on demand.
+            let homeDataStartedAt = StartupDiagnostics.begin("Initial Home data")
+            await homeViewModel.refreshData()
+            StartupDiagnostics.end(
+                "Initial Home data",
+                startedAt: homeDataStartedAt
+            )
 
-            if let errorMessage = householdViewModel.actionState.errorMessage
-                ?? housematesViewModel.actionState.errorMessage {
+            if let errorMessage = homeViewModel.actionState.errorMessage {
                 showToast(
                     message: errorMessage,
                     systemImage: "exclamationmark.triangle.fill",
                     color: .red
                 )
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .houseMateNotificationOpened)) { notification in
-            openSystemNotification(userInfo: notification.userInfo ?? [:])
+
+            // Push/FCM setup is not needed to draw the first screen and may
+            // briefly occupy the main run loop on a cold launch.
+            try? await Task.sleep(for: .seconds(1))
+            if await homeViewModel.registerRemoteNotifications() {
+                StartupDiagnostics.mark(
+                    "Remote notifications registered for "
+                        + AppEnvironment.current.rawValue
+                )
+            } else {
+                StartupDiagnostics.mark(
+                    "Remote notification registration failed: "
+                        + (homeViewModel.actionState.errorMessage ?? "Unknown error")
+                )
+            }
         }
     }
 
@@ -224,6 +265,11 @@ struct TabbarView: View {
 
     @ViewBuilder
     private func destination(for route: MainRoute) -> some View {
+        destinationContent(for: route)
+    }
+
+    @ViewBuilder
+    private func destinationContent(for route: MainRoute) -> some View {
         switch route {
         case .settings:
             SettingsView(
@@ -249,27 +295,13 @@ struct TabbarView: View {
                     await homeViewModel.sendTestNotification()
                 },
                 onAutomaticWeeklyAssignmentChanged: { isEnabled in
-                    do {
-                        try await interactor.updateAutomaticWeeklyAssignment(
-                            isEnabled: isEnabled,
-                            requestedByUserID: homeViewModel.user.userId
-                        )
-                        return true
-                    } catch {
-                        return false
-                    }
+                    await homeViewModel.updateAutomaticWeeklyAssignment(isEnabled)
                 },
                 onRunWeeklyAssignmentNow: {
-                    do {
-                        try await interactor.runWeeklyAssignmentNow(
-                            requestedByUserID: homeViewModel.user.userId
-                        )
-                        return true
-                    } catch {
-                        return false
-                    }
+                    await homeViewModel.runWeeklyAssignmentNow()
                 }
             )
+            .screenAppearAnalytics(name: "SettingsView")
 
         case .householdSettings:
             HouseholdSettingsView(
@@ -337,6 +369,7 @@ struct TabbarView: View {
             )
             .navigationTitle("Bills")
             .navigationBarTitleDisplayMode(.inline)
+            .screenAppearAnalytics(name: "BillsView")
 
         case .householdCleaning:
             CleaningScheduleView(
@@ -367,10 +400,19 @@ struct TabbarView: View {
                             await householdViewModel.deleteTask(task)
                         }
                     )
+                },
+                canLoadMore: householdViewModel.canLoadMoreTasks,
+                isLoadingMore: householdViewModel.isLoadingMoreTasks,
+                onEnsureTaskCount: { date, count in
+                    await householdViewModel.ensureTasksLoaded(
+                        for: date,
+                        minimumCount: count
+                    )
                 }
             )
             .navigationTitle("Cleaning Schedule")
             .navigationBarTitleDisplayMode(.inline)
+            .screenAppearAnalytics(name: "CleaningScheduleView")
 
         case .householdShopping:
             ShoppingCollectionsView(
@@ -436,6 +478,7 @@ struct TabbarView: View {
             )
             .navigationTitle("Shopping")
             .navigationBarTitleDisplayMode(.inline)
+            .screenAppearAnalytics(name: "ShoppingCollectionsView")
 
         case .householdPolls:
             PollsView(
@@ -486,6 +529,8 @@ struct TabbarView: View {
             )
             .navigationTitle("Polls")
             .navigationBarTitleDisplayMode(.inline)
+            .screenAppearAnalytics(name: "PollsView")
+            .task { await householdViewModel.loadPollsIfNeeded() }
 
         case .householdReminders:
             RemindersView(
@@ -532,6 +577,7 @@ struct TabbarView: View {
             )
             .navigationTitle("Reminders")
             .navigationBarTitleDisplayMode(.inline)
+            .screenAppearAnalytics(name: "RemindersView")
 
         case .householdDocuments:
             DocumentsView(
@@ -562,6 +608,8 @@ struct TabbarView: View {
             )
             .navigationTitle("Documents")
             .navigationBarTitleDisplayMode(.inline)
+            .screenAppearAnalytics(name: "DocumentsView")
+            .task { await householdViewModel.loadDocumentsIfNeeded() }
         }
     }
 
@@ -585,6 +633,8 @@ struct TabbarView: View {
             where housematesViewModel.members[index].userId == userID {
             housematesViewModel.members[index].profileImageUrl = imageURL
         }
+
+        onProfileImageChanged(imageURL)
     }
 
     // MARK: - Custom Tab Bar
@@ -1232,39 +1282,80 @@ struct TabbarView: View {
     private func openNotification(
         _ notification: NotificationModel
     ) {
-        guard let destination =
-                notification.destination else {
-            return
-        }
+        // The type is authoritative so historical notifications with the old
+        // generic destination still open the correct feature.
+        let destination = notification.type.defaultDestination
 
-        activeSheet = nil
-
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + 0.25
-        ) {
-            switch destination {
-            case .household:
-                activeTab = .houseHold
-
-            case .housemates:
-                activeTab = .houseHold
-            }
-        }
+        navigate(to: destination, waitsForSheetDismissal: true)
     }
 
     private func openSystemNotification(userInfo: [AnyHashable: Any]) {
-        guard let rawDestination = userInfo["destination"] as? String,
-              let destination = NotificationDestination(rawValue: rawDestination) else {
+        deepLinkCoordinator.handle(notificationUserInfo: userInfo)
+    }
+
+    private func openPendingDeepLink() {
+        guard let deepLink = deepLinkCoordinator.pending else { return }
+
+        guard case let .notification(destination, householdID, _) = deepLink else {
+            // Joining another household is only valid in onboarding.
+            deepLinkCoordinator.consume(deepLink)
             return
         }
 
-        activeSheet = nil
+        if let householdID,
+           householdID != household.householdId {
+            deepLinkCoordinator.consume(deepLink)
+            return
+        }
 
+        navigate(to: destination, waitsForSheetDismissal: activeSheet != nil)
+        deepLinkCoordinator.consume(deepLink)
+    }
+
+    private func navigate(
+        to destination: NotificationDestination,
+        waitsForSheetDismissal: Bool
+    ) {
+        activeSheet = nil
+        router.reset()
+        activeTab = .houseHold
+
+        guard let route = route(for: destination) else {
+            return
+        }
+
+        Task { @MainActor in
+            // First establish Household as the destination's parent tab,
+            // then push after TabView/sheet transitions have settled.
+            if waitsForSheetDismissal {
+                try? await Task.sleep(for: .milliseconds(400))
+            } else {
+                await Task.yield()
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+
+            router.navigate(to: route, trackInteraction: false)
+        }
+    }
+
+    private func route(
+        for destination: NotificationDestination
+    ) -> MainRoute? {
         switch destination {
-        case .household:
-            activeTab = .houseHold
-        case .housemates:
-            activeTab = .houseHold
+        case .household, .housemates:
+            return nil
+        case .tasks:
+            return .householdCleaning
+        case .shopping:
+            return .householdShopping
+        case .bills:
+            return .householdBills
+        case .polls:
+            return .householdPolls
+        case .reminders:
+            return .householdReminders(UUID())
+        case .documents:
+            return .householdDocuments
         }
     }
 }
@@ -1290,6 +1381,23 @@ private enum TabbarSheet: String, Identifiable {
 
     var id: String {
         rawValue
+    }
+
+    var analyticsScreenName: String {
+        switch self {
+        case .notifications: "NotificationsView"
+        case .householdActions: "HouseholdQuickActionsView"
+        case .calendarActions: "CalendarQuickActionsView"
+        case .housematesActions: "HousematesQuickActionsView"
+        case .chore: "AddChoreView"
+        case .shoppingItem: "AddShoppingItemView"
+        case .bill: "AddBillView"
+        case .housemate: "AddHousemateView"
+        case .post: "AddBoardPostView"
+        case .poll: "AddPollView"
+        case .reminder: "AddHouseReminderView"
+        case .document: "AddDocumentView"
+        }
     }
 }
 

@@ -94,13 +94,29 @@ final class HomeViewModel {
                     return false
                 }
 
-                return task.assignedToUserId == user.id
+                return task.status == .pending
+                    && task.assignedToUserId == user.id
                     && calendar.isDateInToday(dueDate)
             }
             .sorted {
                 ($0.dueDate ?? .distantFuture)
                     < ($1.dueDate ?? .distantFuture)
             }
+    }
+
+    func ensureTodaysTasksLoaded() async {
+        var previousTaskCount = -1
+
+        while interactor.canLoadMoreTasks,
+              tasks.count != previousTaskCount {
+            previousTaskCount = tasks.count
+
+            do {
+                try await interactor.loadMoreTasks()
+            } catch {
+                return
+            }
+        }
     }
 
     // MARK: - Coming Up
@@ -251,8 +267,14 @@ final class HomeViewModel {
     // MARK: - Task Actions
 
     func toggleTaskStatus(_ task: TaskModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.toggleTaskStatus(task)
+        interactor.trackEvent(Event.toggleTaskStatusStart(task: task))
+        do {
+            try await actionState.run { try await self.interactor.toggleTaskStatus(task) }
+            interactor.trackEvent(Event.toggleTaskStatusSuccess(task: task))
+            return true
+        } catch {
+            interactor.trackEvent(Event.toggleTaskStatusFail(error: error, task: task))
+            return false
         }
     }
 
@@ -261,16 +283,28 @@ final class HomeViewModel {
     func toggleShoppingItem(
         _ item: ShoppingItemModel
     ) async -> Bool {
-        await actionState.perform {
-            try await interactor.toggleShoppingItemPurchased(item)
+        interactor.trackEvent(Event.toggleShoppingItemStart(item: item))
+        do {
+            try await actionState.run { try await self.interactor.toggleShoppingItemPurchased(item) }
+            interactor.trackEvent(Event.toggleShoppingItemSuccess(item: item))
+            return true
+        } catch {
+            interactor.trackEvent(Event.toggleShoppingItemFail(error: error, item: item))
+            return false
         }
     }
 
     // MARK: - Bill Actions
 
     func markBillAsPaid(_ bill: BillModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.markBillAsPaid(bill, paidByUserID: user.id)
+        interactor.trackEvent(Event.markBillAsPaidStart(bill: bill))
+        do {
+            try await actionState.run { try await self.interactor.markBillAsPaid(bill, paidByUserID: self.user.id) }
+            interactor.trackEvent(Event.markBillAsPaidSuccess(bill: bill))
+            return true
+        } catch {
+            interactor.trackEvent(Event.markBillAsPaidFail(error: error, bill: bill))
+            return false
         }
     }
 
@@ -279,25 +313,160 @@ final class HomeViewModel {
             return
         }
 
-        await actionState.capture {
-            try await interactor.fetchTasks(householdID: householdID, currentUserID: user.id)
-            try await interactor.fetchShoppingItems(householdID: householdID)
-            try await interactor.fetchBills(householdID: householdID)
-            try await interactor.fetchHouseReminders(householdID: householdID)
+        interactor.trackEvent(Event.refreshDataStart)
+        do {
+            try await actionState.run {
+            let tasksStartedAt = StartupDiagnostics.begin("Home tasks setup")
+            try await self.interactor.fetchTasks(householdID: householdID, currentUserID: self.user.id)
+            StartupDiagnostics.end("Home tasks setup", startedAt: tasksStartedAt)
+
+            let shoppingStartedAt = StartupDiagnostics.begin("Home shopping setup")
+            try await self.interactor.fetchShoppingItems(householdID: householdID)
+            StartupDiagnostics.end("Home shopping setup", startedAt: shoppingStartedAt)
+
+            let billsStartedAt = StartupDiagnostics.begin("Home bills setup")
+            try await self.interactor.fetchBills(householdID: householdID)
+            StartupDiagnostics.end("Home bills setup", startedAt: billsStartedAt)
+
+            let remindersStartedAt = StartupDiagnostics.begin("Home reminders setup")
+            try await self.interactor.fetchHouseReminders(householdID: householdID)
+            StartupDiagnostics.end("Home reminders setup", startedAt: remindersStartedAt)
+            }
+            interactor.trackEvent(Event.refreshDataSuccess)
+        } catch {
+            interactor.trackEvent(Event.refreshDataFail(error: error))
         }
     }
 
     func applyNotificationPreferences() async {
+        interactor.trackEvent(Event.applyNotificationPreferencesStart)
         await interactor.applyLocalNotificationPreferences()
+        interactor.trackEvent(Event.applyNotificationPreferencesSuccess)
     }
 
     func notificationAuthorizationStatus() async -> LocalNotificationAuthorizationStatus {
-        await interactor.localNotificationAuthorizationStatus()
+        interactor.trackEvent(Event.notificationAuthorizationStatusStart)
+        let status = await interactor.localNotificationAuthorizationStatus()
+        interactor.trackEvent(Event.notificationAuthorizationStatusSuccess(status: status))
+        return status
     }
 
     func sendTestNotification() async -> Bool {
-        await actionState.perform {
-            try await interactor.sendTestNotification()
+        interactor.trackEvent(Event.sendTestNotificationStart)
+        do {
+            try await actionState.run { try await self.interactor.sendTestNotification() }
+            interactor.trackEvent(Event.sendTestNotificationSuccess)
+            return true
+        } catch {
+            interactor.trackEvent(Event.sendTestNotificationFail(error: error))
+            return false
+        }
+    }
+
+    func registerRemoteNotifications() async -> Bool {
+        interactor.trackEvent(Event.registerRemoteNotificationsStart)
+        do {
+            try await actionState.run { try await self.interactor.registerRemoteNotifications(for: self.user) }
+            interactor.trackEvent(Event.registerRemoteNotificationsSuccess)
+            return true
+        } catch {
+            interactor.trackEvent(Event.registerRemoteNotificationsFail(error: error))
+            return false
+        }
+    }
+
+    func updateAutomaticWeeklyAssignment(_ isEnabled: Bool) async -> Bool {
+        interactor.trackEvent(Event.updateAutomaticWeeklyAssignmentStart(isEnabled: isEnabled))
+        do {
+            try await actionState.run {
+                try await self.interactor.updateAutomaticWeeklyAssignment(isEnabled: isEnabled, requestedByUserID: self.user.id)
+            }
+            interactor.trackEvent(Event.updateAutomaticWeeklyAssignmentSuccess(isEnabled: isEnabled))
+            return true
+        } catch {
+            interactor.trackEvent(Event.updateAutomaticWeeklyAssignmentFail(error: error, isEnabled: isEnabled))
+            return false
+        }
+    }
+
+    func runWeeklyAssignmentNow() async -> Bool {
+        interactor.trackEvent(Event.runWeeklyAssignmentNowStart)
+        do {
+            try await actionState.run { try await self.interactor.runWeeklyAssignmentNow(requestedByUserID: self.user.id) }
+            interactor.trackEvent(Event.runWeeklyAssignmentNowSuccess)
+            return true
+        } catch {
+            interactor.trackEvent(Event.runWeeklyAssignmentNowFail(error: error))
+            return false
+        }
+    }
+
+    enum Event: LoggableEvent {
+        case toggleTaskStatusStart(task: TaskModel), toggleTaskStatusSuccess(task: TaskModel), toggleTaskStatusFail(error: Error, task: TaskModel)
+        case toggleShoppingItemStart(item: ShoppingItemModel), toggleShoppingItemSuccess(item: ShoppingItemModel), toggleShoppingItemFail(error: Error, item: ShoppingItemModel)
+        case markBillAsPaidStart(bill: BillModel), markBillAsPaidSuccess(bill: BillModel), markBillAsPaidFail(error: Error, bill: BillModel)
+        case refreshDataStart, refreshDataSuccess, refreshDataFail(error: Error)
+        case applyNotificationPreferencesStart, applyNotificationPreferencesSuccess
+        case notificationAuthorizationStatusStart, notificationAuthorizationStatusSuccess(status: LocalNotificationAuthorizationStatus)
+        case sendTestNotificationStart, sendTestNotificationSuccess, sendTestNotificationFail(error: Error)
+        case registerRemoteNotificationsStart, registerRemoteNotificationsSuccess, registerRemoteNotificationsFail(error: Error)
+        case updateAutomaticWeeklyAssignmentStart(isEnabled: Bool), updateAutomaticWeeklyAssignmentSuccess(isEnabled: Bool), updateAutomaticWeeklyAssignmentFail(error: Error, isEnabled: Bool)
+        case runWeeklyAssignmentNowStart, runWeeklyAssignmentNowSuccess, runWeeklyAssignmentNowFail(error: Error)
+
+        var eventName: String {
+            switch self {
+            case .toggleTaskStatusStart: "HomeView_ToggleTaskStatus_Start";
+            case .toggleTaskStatusSuccess: "HomeView_ToggleTaskStatus_Success";
+            case .toggleTaskStatusFail: "HomeView_ToggleTaskStatus_Fail"
+            case .toggleShoppingItemStart: "HomeView_ToggleShoppingItem_Start";
+            case .toggleShoppingItemSuccess: "HomeView_ToggleShoppingItem_Success";
+            case .toggleShoppingItemFail: "HomeView_ToggleShoppingItem_Fail"
+            case .markBillAsPaidStart: "HomeView_MarkBillAsPaid_Start";
+            case .markBillAsPaidSuccess: "HomeView_MarkBillAsPaid_Success";
+            case .markBillAsPaidFail: "HomeView_MarkBillAsPaid_Fail"
+            case .refreshDataStart: "HomeView_RefreshData_Start";
+            case .refreshDataSuccess: "HomeView_RefreshData_Success";
+            case .refreshDataFail: "HomeView_RefreshData_Fail"
+            case .applyNotificationPreferencesStart: "HomeView_ApplyNotificationPreferences_Start";
+            case .applyNotificationPreferencesSuccess: "HomeView_ApplyNotificationPreferences_Success"
+            case .notificationAuthorizationStatusStart: "HomeView_NotificationAuthorizationStatus_Start";
+            case .notificationAuthorizationStatusSuccess: "HomeView_NotificationAuthorizationStatus_Success"
+            case .sendTestNotificationStart: "HomeView_SendTestNotification_Start";
+            case .sendTestNotificationSuccess: "HomeView_SendTestNotification_Success";
+            case .sendTestNotificationFail: "HomeView_SendTestNotification_Fail"
+            case .registerRemoteNotificationsStart: "HomeView_RegisterRemoteNotifications_Start";
+            case .registerRemoteNotificationsSuccess: "HomeView_RegisterRemoteNotifications_Success";
+            case .registerRemoteNotificationsFail: "HomeView_RegisterRemoteNotifications_Fail"
+            case .updateAutomaticWeeklyAssignmentStart: "HomeView_UpdateAutomaticWeeklyAssignment_Start";
+            case .updateAutomaticWeeklyAssignmentSuccess: "HomeView_UpdateAutomaticWeeklyAssignment_Success";
+            case .updateAutomaticWeeklyAssignmentFail: "HomeView_UpdateAutomaticWeeklyAssignment_Fail"
+            case .runWeeklyAssignmentNowStart: "HomeView_RunWeeklyAssignmentNow_Start";
+            case .runWeeklyAssignmentNowSuccess: "HomeView_RunWeeklyAssignmentNow_Success";
+            case .runWeeklyAssignmentNowFail: "HomeView_RunWeeklyAssignmentNow_Fail"
+            }
+        }
+
+        var parameters: [String: Any]? {
+            switch self {
+            case .toggleTaskStatusStart(let model), .toggleTaskStatusSuccess(let model): model.eventParameters
+            case .toggleTaskStatusFail(let error, let model): model.eventParameters.merging(error.eventParameters) { current, _ in current }
+            case .toggleShoppingItemStart(let model), .toggleShoppingItemSuccess(let model): model.eventParameters
+            case .toggleShoppingItemFail(let error, let model): model.eventParameters.merging(error.eventParameters) { current, _ in current }
+            case .markBillAsPaidStart(let model), .markBillAsPaidSuccess(let model): model.eventParameters
+            case .markBillAsPaidFail(let error, let model): model.eventParameters.merging(error.eventParameters) { current, _ in current }
+            case .notificationAuthorizationStatusSuccess(let status): ["authorization_status": String(describing: status)]
+            case .updateAutomaticWeeklyAssignmentStart(let value), .updateAutomaticWeeklyAssignmentSuccess(let value): ["is_enabled": value]
+            case .updateAutomaticWeeklyAssignmentFail(let error, let value): ["is_enabled": value].merging(error.eventParameters) { current, _ in current }
+            case .refreshDataFail(let error), .sendTestNotificationFail(let error), .registerRemoteNotificationsFail(let error), .runWeeklyAssignmentNowFail(let error): error.eventParameters
+            default: nil
+            }
+        }
+
+        var type: LogType {
+            switch self {
+            case .toggleTaskStatusFail, .toggleShoppingItemFail, .markBillAsPaidFail, .refreshDataFail, .sendTestNotificationFail, .registerRemoteNotificationsFail, .updateAutomaticWeeklyAssignmentFail, .runWeeklyAssignmentNowFail: .severe
+            default: .analytic
+            }
         }
     }
 }
@@ -327,6 +496,10 @@ struct HomeView: View {
             content
             toastOverlay
         }
+        .task(id: viewModel.tasks.count) {
+            await viewModel.ensureTodaysTasksLoaded()
+        }
+        .screenAppearAnalytics(name: "HomeView")
     }
 
     // MARK: - Content
@@ -524,7 +697,9 @@ struct HomeView: View {
             tasks: viewModel.todaysTasks,
             showsAddButton: false,
             usesThinMaterial: true,
-            onOpenAll: onOpenTasks,
+            onOpenAll: {
+                onOpenTasks()
+            },
             onToggleStatus: { task in
                 performAction(
                     successMessage: task.status == .completed
@@ -551,11 +726,15 @@ struct HomeView: View {
         HStack(alignment: .top, spacing: 12) {
             HomeCompactComingUpCard(
                 items: viewModel.comingUpItems,
-                onTap: onOpenReminders
+                onTap: {
+                    onOpenReminders()
+                }
             )
             HomeCompactBillsCard(
                 bills: viewModel.upcomingBills,
-                onTap: onOpenBills
+                onTap: {
+                    onOpenBills()
+                }
             )
         }
         .dashboardShadow()
@@ -569,7 +748,9 @@ struct HomeView: View {
             lists: viewModel.shoppingLists,
             showsAddButton: false,
             usesThinMaterial: true,
-            onOpenAll: onOpenShopping,
+            onOpenAll: { listID in
+                onOpenShopping(listID)
+            },
             onTogglePurchased: { item in
                 performAction(
                     successMessage: item.isPurchased
@@ -675,6 +856,7 @@ struct HomeView: View {
         }
         .ignoresSafeArea()
     }
+
 }
 
 // MARK: - Dashboard Shadow

@@ -280,9 +280,15 @@ struct SettingsView: View {
             .disabled(isSendingTestNotification)
 #endif
         }
-        .onChange(of: taskNotificationsEnabled) { _, _ in updateNotificationPreferences() }
-        .onChange(of: houseReminderNotificationsEnabled) { _, _ in updateNotificationPreferences() }
-        .onChange(of: billNotificationsEnabled) { _, _ in updateNotificationPreferences() }
+        .onChange(of: taskNotificationsEnabled) { _, enabled in
+            updateNotificationPreferences()
+        }
+        .onChange(of: houseReminderNotificationsEnabled) { _, enabled in
+            updateNotificationPreferences()
+        }
+        .onChange(of: billNotificationsEnabled) { _, enabled in
+            updateNotificationPreferences()
+        }
         .listRowBackground(settingsRowBackground)
     }
 

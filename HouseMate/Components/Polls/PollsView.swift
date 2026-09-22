@@ -58,7 +58,9 @@ struct PollsView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: onAdd) {
+                Button {
+                    onAdd()
+                } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Create poll")

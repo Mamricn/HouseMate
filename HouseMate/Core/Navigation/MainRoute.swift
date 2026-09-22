@@ -20,4 +20,19 @@ enum MainRoute: Hashable {
     case householdPolls
     case householdReminders(UUID)
     case householdDocuments
+
+    var analyticsName: String {
+        switch self {
+        case .settings: "settings"
+        case .householdSettings: "household_settings"
+        case .accountSettings: "account_settings"
+        case .profileSettings: "profile_settings"
+        case .householdBills: "bills"
+        case .householdCleaning: "cleaning"
+        case .householdShopping: "shopping"
+        case .householdPolls: "polls"
+        case .householdReminders: "reminders"
+        case .householdDocuments: "documents"
+        }
+    }
 }

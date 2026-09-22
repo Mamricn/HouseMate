@@ -44,26 +44,94 @@ final class NotificationsViewModel {
     }
 
     func fetchNotifications() async {
-        await actionState.capture {
-            try await interactor.fetchNotifications(userID: currentUserId)
-        }
+        interactor.trackEvent(Event.fetchNotificationsStart)
+        do {
+            try await actionState.run { try await interactor.fetchNotifications(userID: currentUserId) }
+            interactor.trackEvent(Event.fetchNotificationsSuccess)
+        } catch { interactor.trackEvent(Event.fetchNotificationsFail(error: error)) }
     }
 
     func markAsRead(_ notification: NotificationModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.markNotificationAsRead(notification, userID: currentUserId)
-        }
+        interactor.trackEvent(Event.markAsReadStart(notification: notification))
+        do {
+            try await actionState.run { try await interactor.markNotificationAsRead(notification, userID: currentUserId) }
+            interactor.trackEvent(Event.markAsReadSuccess(notification: notification)); return true
+        } catch { interactor.trackEvent(Event.markAsReadFail(error: error, notification: notification)); return false }
     }
 
     func markAllAsRead() async -> Bool {
-        await actionState.perform {
-            try await interactor.markAllNotificationsAsRead(userID: currentUserId)
-        }
+        interactor.trackEvent(Event.markAllAsReadStart)
+        do {
+            try await actionState.run { try await interactor.markAllNotificationsAsRead(userID: currentUserId) }
+            interactor.trackEvent(Event.markAllAsReadSuccess); return true
+        } catch { interactor.trackEvent(Event.markAllAsReadFail(error: error)); return false }
     }
 
     func deleteNotification(_ notification: NotificationModel) async -> Bool {
-        await actionState.perform {
-            try await interactor.deleteNotification(notification, userID: currentUserId)
+        interactor.trackEvent(Event.deleteNotificationStart(notification: notification))
+        do {
+            try await actionState.run { try await interactor.deleteNotification(notification, userID: currentUserId) }
+            interactor.trackEvent(Event.deleteNotificationSuccess(notification: notification)); return true
+        } catch { interactor.trackEvent(Event.deleteNotificationFail(error: error, notification: notification)); return false }
+    }
+
+    enum Event: LoggableEvent {
+        case fetchNotificationsStart
+        case fetchNotificationsSuccess
+        case fetchNotificationsFail(error: Error)
+        case markAsReadStart(notification: NotificationModel)
+        case markAsReadSuccess(notification: NotificationModel)
+        case markAsReadFail(error: Error, notification: NotificationModel)
+        case markAllAsReadStart
+        case markAllAsReadSuccess
+        case markAllAsReadFail(error: Error)
+        case deleteNotificationStart(notification: NotificationModel)
+        case deleteNotificationSuccess(notification: NotificationModel)
+        case deleteNotificationFail(error: Error, notification: NotificationModel)
+
+        var eventName: String {
+            switch self {
+            case .fetchNotificationsStart: "NotificationsView_FetchNotifications_Start"
+            case .fetchNotificationsSuccess: "NotificationsView_FetchNotifications_Success"
+            case .fetchNotificationsFail: "NotificationsView_FetchNotifications_Fail"
+            case .markAsReadStart: "NotificationsView_MarkAsRead_Start"
+            case .markAsReadSuccess: "NotificationsView_MarkAsRead_Success"
+            case .markAsReadFail: "NotificationsView_MarkAsRead_Fail"
+            case .markAllAsReadStart: "NotificationsView_MarkAllAsRead_Start"
+            case .markAllAsReadSuccess: "NotificationsView_MarkAllAsRead_Success"
+            case .markAllAsReadFail: "NotificationsView_MarkAllAsRead_Fail"
+            case .deleteNotificationStart: "NotificationsView_DeleteNotification_Start"
+            case .deleteNotificationSuccess: "NotificationsView_DeleteNotification_Success"
+            case .deleteNotificationFail: "NotificationsView_DeleteNotification_Fail"
+            }
+        }
+
+        var parameters: [String: Any]? {
+            switch self {
+            case .markAsReadStart(let notification),
+                 .markAsReadSuccess(let notification),
+                 .deleteNotificationStart(let notification),
+                 .deleteNotificationSuccess(let notification):
+                notification.eventParameters
+            case .markAsReadFail(let error, let notification),
+                 .deleteNotificationFail(let error, let notification):
+                notification.eventParameters.merging(error.eventParameters) { current, _ in current }
+            case .fetchNotificationsFail(let error),
+                 .markAllAsReadFail(let error):
+                error.eventParameters
+            default:
+                nil
+            }
+        }
+
+        var type: LogType {
+            switch self {
+            case .fetchNotificationsFail, .markAsReadFail,
+                 .markAllAsReadFail, .deleteNotificationFail:
+                .severe
+            default:
+                .analytic
+            }
         }
     }
 }
