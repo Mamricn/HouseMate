@@ -106,6 +106,13 @@ final class HousematesViewModel {
         } catch { interactor.trackEvent(Event.fetchInitialPostsFail(error: error)) }
     }
 
+    func ensureInviteLookup(for household: HouseholdModel) async throws {
+        try await interactor.ensureInviteLookup(
+            for: household,
+            requestedByUserID: currentUser.id
+        )
+    }
+
     func loadMorePosts() {
         Task {
             interactor.trackEvent(Event.loadMorePostsStart)
@@ -313,7 +320,9 @@ struct HousematesView: View {
     private var housemateSheet: some View {
         Group {
             if let household = viewModel.household {
-                AddHousemateView(household: household)
+                AddHousemateView(household: household) {
+                    try await viewModel.ensureInviteLookup(for: household)
+                }
             } else {
                 ContentUnavailableView(
                     "Household unavailable",

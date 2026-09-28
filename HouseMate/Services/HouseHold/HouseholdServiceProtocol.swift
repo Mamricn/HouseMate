@@ -18,6 +18,11 @@ protocol HouseholdServiceProtocol: AnyObject {
 
     func fetchHousehold(householdID: String) async throws -> HouseholdModel?
 
+    func ensureInviteLookup(
+        for household: HouseholdModel,
+        requestedByUserID: String
+    ) async throws
+
     func fetchMembers(householdID: String) async throws -> [HouseholdMemberModel]
 
     func updateAutomaticWeeklyAssignment(

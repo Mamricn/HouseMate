@@ -117,6 +117,20 @@ final class HouseholdManager {
         return household
     }
 
+    func ensureInviteLookup(
+        for household: HouseholdModel,
+        requestedByUserID: String
+    ) async throws {
+        guard household.ownerUserId == requestedByUserID else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        try await householdService.ensureInviteLookup(
+            for: household,
+            requestedByUserID: requestedByUserID
+        )
+    }
+
     func clearCurrentHousehold() {
         membersObservation?.cancel()
         membersObservation = nil

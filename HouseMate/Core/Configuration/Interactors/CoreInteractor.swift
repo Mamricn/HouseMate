@@ -285,6 +285,16 @@ struct CoreInteractor {
         )
     }
 
+    func ensureInviteLookup(
+        for household: HouseholdModel,
+        requestedByUserID: String
+    ) async throws {
+        try await householdManager.ensureInviteLookup(
+            for: household,
+            requestedByUserID: requestedByUserID
+        )
+    }
+
     func restoreCachedHousehold(
         _ household: HouseholdModel,
         members: [HouseholdMemberModel]

@@ -6,8 +6,11 @@ struct AddHousemateView: View {
     @Environment(\.dismiss) private var dismiss
 
     let household: HouseholdModel
+    var ensureInviteLookup: () async throws -> Void = {}
 
     @State private var didCopyCode = false
+    @State private var inviteErrorMessage: String?
+    @State private var invitePreparationState = InvitePreparationState.loading
 
     var body: some View {
         NavigationStack {
@@ -27,6 +30,26 @@ struct AddHousemateView: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+        .task {
+            do {
+                try await ensureInviteLookup()
+                invitePreparationState = .ready
+            } catch {
+                invitePreparationState = .failed
+                inviteErrorMessage = error.localizedDescription
+            }
+        }
+        .alert(
+            "Invitation could not be prepared",
+            isPresented: Binding(
+                get: { inviteErrorMessage != nil },
+                set: { if !$0 { inviteErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(inviteErrorMessage ?? "Please try again.")
         }
     }
 
@@ -53,9 +76,28 @@ struct AddHousemateView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+
+            preparationStatus
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var preparationStatus: some View {
+        switch invitePreparationState {
+        case .loading:
+            Label("Preparing invitation…", systemImage: "arrow.trianglehead.2.clockwise")
+                .foregroundStyle(.secondary)
+
+        case .ready:
+            Label("Invitation ready", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+
+        case .failed:
+            Label("Invitation unavailable", systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+        }
     }
 
     private var inviteCodeCard: some View {
@@ -110,7 +152,11 @@ struct AddHousemateView: View {
     }
 
     private var inviteMessage: String {
-        "You're invited to join \(household.name) on HouseMate: https://housemate-5fbc5.web.app/join/\(household.inviteCode) (invite code: \(household.inviteCode))."
+        let url = AppEnvironment.current.invitationURL(
+            inviteCode: household.inviteCode
+        )?.absoluteString ?? "housemate://join/\(household.inviteCode)"
+
+        return "You're invited to join \(household.name) on HouseMate: \(url) (invite code: \(household.inviteCode))."
     }
 
     private func copyInviteCode() {
@@ -128,6 +174,12 @@ struct AddHousemateView: View {
             }
         }
     }
+}
+
+private enum InvitePreparationState {
+    case loading
+    case ready
+    case failed
 }
 
 #Preview {

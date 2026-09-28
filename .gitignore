@@ -7,6 +7,14 @@ yarn-error.log*
 firebase-debug.log*
 firebase-debug.*.log*
 
+# macOS
+.DS_Store
+
+# Xcode user-specific state
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
 # Firebase cache
 .firebase/
 

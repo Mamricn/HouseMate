@@ -17,6 +17,10 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
         database.collection("households")
     }
 
+    private var householdInvitesCollection: CollectionReference {
+        database.collection("household_invites")
+    }
+
     var updatesUserHouseholdAtomically: Bool {
         true
     }
@@ -66,6 +70,9 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             .collection("members")
             .document(owner.userId)
 
+        let inviteReference = householdInvitesCollection
+            .document(inviteCode)
+
         let userReference = database
             .collection("users")
             .document(owner.userId)
@@ -82,8 +89,19 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             forDocument: memberReference
         )
 
+        batch.setData(
+            [
+                "invite_code": inviteCode,
+                "household_id": household.householdId,
+                "created_by_user_id": owner.userId,
+                "active": true,
+                "created_at": FieldValue.serverTimestamp()
+            ],
+            forDocument: inviteReference
+        )
+
         batch.updateData(
-            ["household_id": household.householdId],
+            ["household_id": householdReference.documentID],
             forDocument: userReference
         )
 
@@ -103,34 +121,24 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             throw HouseholdServiceError.invalidInviteCode
         }
 
-        let snapshot = try await householdsCollection
-            .whereField("invite_code", isEqualTo: normalizedCode)
-            .limit(to: 1)
-            .getDocuments()
-
-        guard let document = snapshot.documents.first else {
-            throw HouseholdServiceError.householdNotFound
-        }
-
-        guard document.data()["deletion_state"] == nil else {
-            throw HouseholdServiceError.householdNotFound
-        }
-
-        var household = try Firestore.Decoder().decode(
-            HouseholdModel.self,
-            from: document.data()
+        let householdReference = try await householdReference(
+            forInviteCode: normalizedCode
         )
+
+        guard let householdReference else {
+            throw HouseholdServiceError.householdNotFound
+        }
 
         let member = makeMember(
             user: user,
-            householdID: household.householdId
+            householdID: householdReference.documentID
         )
 
         let memberData = try Firestore.Encoder().encode(
             member
         )
 
-        let memberReference = document.reference
+        let memberReference = householdReference
             .collection("members")
             .document(user.userId)
 
@@ -146,7 +154,7 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
                     user.userId
                 ])
             ],
-            forDocument: document.reference
+            forDocument: householdReference
         )
 
         batch.setData(
@@ -156,17 +164,24 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
         )
 
         batch.updateData(
-            ["household_id": household.householdId],
+            ["household_id": householdReference.documentID],
             forDocument: userReference
         )
 
         try await batch.commit()
 
-        if !household.memberIds.contains(user.userId) {
-            household.memberIds.append(user.userId)
+        let householdSnapshot = try await householdReference.getDocument()
+
+        guard householdSnapshot.exists,
+              let householdData = householdSnapshot.data()
+        else {
+            throw HouseholdServiceError.householdNotFound
         }
 
-        return household
+        return try Firestore.Decoder().decode(
+            HouseholdModel.self,
+            from: householdData
+        )
     }
 
     func fetchHousehold(householdID: String) async throws -> HouseholdModel? {
@@ -180,10 +195,25 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             return nil
         }
 
-        return try Firestore.Decoder().decode(
+        let household = try Firestore.Decoder().decode(
             HouseholdModel.self,
             from: data
         )
+
+        do {
+            try await ensureInviteLookup(
+                for: household,
+                requestedByUserID: household.ownerUserId
+            )
+        } catch {
+            // Invite migration must never prevent an existing member from
+            // opening their household. The owner can retry on the next load.
+            #if DEBUG
+            print("Invite lookup backfill failed: \(error.localizedDescription)")
+            #endif
+        }
+
+        return household
     }
 
     func fetchMembers(householdID: String) async throws -> [HouseholdMemberModel] {
@@ -444,7 +474,18 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
             householdReference: householdReference
         )
 
-        try await householdReference.delete()
+        let inviteReference = householdInvitesCollection.document(
+            household.inviteCode
+        )
+        let inviteSnapshot = try await inviteReference.getDocument()
+        let finalBatch = database.batch()
+
+        if inviteSnapshot.exists {
+            finalBatch.deleteDocument(inviteReference)
+        }
+
+        finalBatch.deleteDocument(householdReference)
+        try await finalBatch.commit()
     }
 
     func observeMembers(
@@ -482,17 +523,80 @@ final class FirebaseHouseholdService: HouseholdServiceProtocol {
         for _ in 0..<10 {
             let inviteCode = Self.makeInviteCode()
 
-            let snapshot = try await householdsCollection
-                .whereField("invite_code", isEqualTo: inviteCode)
-                .limit(to: 1)
-                .getDocuments()
+            let snapshot = try await householdInvitesCollection
+                .document(inviteCode)
+                .getDocument()
 
-            if snapshot.documents.isEmpty {
+            if !snapshot.exists {
                 return inviteCode
             }
         }
 
         throw HouseholdServiceError.unableToCreateInviteCode
+    }
+
+    private func householdReference(
+        forInviteCode inviteCode: String
+    ) async throws -> DocumentReference? {
+        let inviteSnapshot = try await householdInvitesCollection
+            .document(inviteCode)
+            .getDocument()
+
+        if inviteSnapshot.exists {
+            guard let householdID =
+                    inviteSnapshot.data()?["household_id"] as? String,
+                  !householdID.isEmpty,
+                  inviteSnapshot.data()?["active"] as? Bool != false
+            else {
+                return nil
+            }
+
+            return householdsCollection.document(householdID)
+        }
+
+        // Temporary compatibility path for households created before the
+        // dedicated invite lookup collection was introduced. Remove this
+        // query after all existing invite documents have been backfilled.
+        let legacySnapshot = try await householdsCollection
+            .whereField("invite_code", isEqualTo: inviteCode)
+            .limit(to: 1)
+            .getDocuments()
+
+        return legacySnapshot.documents.first?.reference
+    }
+
+    func ensureInviteLookup(
+        for household: HouseholdModel,
+        requestedByUserID: String
+    ) async throws {
+        guard requestedByUserID == household.ownerUserId else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+
+        let inviteReference = householdInvitesCollection.document(
+            household.inviteCode
+        )
+        let inviteSnapshot = try await inviteReference.getDocument(
+            source: .server
+        )
+
+        guard !inviteSnapshot.exists else { return }
+
+        try await inviteReference.setData([
+            "invite_code": household.inviteCode,
+            "household_id": household.householdId,
+            "created_by_user_id": household.ownerUserId,
+            "active": true,
+            "created_at": FieldValue.serverTimestamp()
+        ])
+
+        let savedInvite = try await inviteReference.getDocument(
+            source: .server
+        )
+
+        guard savedInvite.exists else {
+            throw HouseholdServiceError.unableToCreateInviteCode
+        }
     }
 
     private func deleteDocumentsInBatches(

@@ -1130,7 +1130,9 @@ struct TabbarView: View {
     // MARK: - Housemates Forms
 
     private var housemateSheet: some View {
-        AddHousemateView(household: household)
+        AddHousemateView(household: household) {
+            try await housematesViewModel.ensureInviteLookup(for: household)
+        }
         .presentationDetents([.height(520)])
         .presentationDragIndicator(.visible)
     }

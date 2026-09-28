@@ -27,14 +27,15 @@ enum HomeDataCache {
     static func load<Value: Codable>(
         _ type: Value.Type = Value.self,
         feature: Feature,
-        householdID: String
+        householdID: String,
+        defaults: UserDefaults = .standard,
+        now: Date = .now
     ) -> Value? {
-        let defaults = UserDefaults.standard
         let cacheKey = key(feature: feature, householdID: householdID)
 
         guard let data = defaults.data(forKey: cacheKey),
               let entry = try? JSONDecoder().decode(Entry<Value>.self, from: data),
-              Date.now.timeIntervalSince(entry.savedAt) <= maximumAge else {
+              now.timeIntervalSince(entry.savedAt) <= maximumAge else {
             defaults.removeObject(forKey: cacheKey)
             return nil
         }
@@ -45,12 +46,14 @@ enum HomeDataCache {
     static func save<Value: Codable>(
         _ value: Value,
         feature: Feature,
-        householdID: String
+        householdID: String,
+        defaults: UserDefaults = .standard,
+        now: Date = .now
     ) {
-        let entry = Entry(savedAt: Date.now, value: value)
+        let entry = Entry(savedAt: now, value: value)
         guard let data = try? JSONEncoder().encode(entry) else { return }
 
-        UserDefaults.standard.set(
+        defaults.set(
             data,
             forKey: key(feature: feature, householdID: householdID)
         )

@@ -101,6 +101,15 @@ final class MockHouseholdService: HouseholdServiceProtocol {
         households[householdID]
     }
 
+    func ensureInviteLookup(
+        for household: HouseholdModel,
+        requestedByUserID: String
+    ) async throws {
+        guard household.ownerUserId == requestedByUserID else {
+            throw HouseholdServiceError.ownerPermissionRequired
+        }
+    }
+
     func fetchMembers(householdID: String) async throws -> [HouseholdMemberModel] {
         Array(membersByHouseholdID[householdID, default: [:]].values)
             .sorted {

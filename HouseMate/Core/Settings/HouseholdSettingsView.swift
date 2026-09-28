@@ -698,7 +698,11 @@ struct HouseholdSettingsView: View {
     }
 
     private var inviteMessage: String {
-        "Join \(viewModel.household.name) on HouseMate: https://housemate-5fbc5.web.app/join/\(viewModel.household.inviteCode) (invite code: \(viewModel.household.inviteCode))."
+        let url = AppEnvironment.current.invitationURL(
+            inviteCode: viewModel.household.inviteCode
+        )?.absoluteString ?? "housemate://join/\(viewModel.household.inviteCode)"
+
+        return "Join \(viewModel.household.name) on HouseMate: \(url) (invite code: \(viewModel.household.inviteCode))."
     }
 
     private var errorBinding: Binding<Bool> {

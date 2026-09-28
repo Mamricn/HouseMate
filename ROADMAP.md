@@ -147,16 +147,19 @@ See `FEATURES.md` for the detailed notification policy.
 - [ ] Add and document required Firestore indexes
 - [ ] Review query cost and unnecessary document reads
 - [x] Separate Development and Production Firebase configuration
-- [ ] Test rules using the Firebase Emulator Suite
+- [x] Test core Firestore rules using the Firebase Emulator Suite
 - [ ] Plan schema migrations for future model changes
 
 ## 10. Testing and release
 
 - [ ] Test the complete flow with at least two real accounts
-- [ ] Test owner/member permissions and ownership transfer
+- [ ] Test owner/member permissions and ownership transfer with real accounts
 - [ ] Test household deletion and account deletion failure scenarios
 - [ ] Test notification delivery on physical devices
-- [ ] Add unit tests for critical managers and ownership rules
+- [x] Add unit tests for critical managers
+- [x] Add unit coverage for owner/member permissions and ownership transfer
+- [x] Add unit coverage for local authentication and session-state behaviour
+- [x] Add automated tests for ownership and core Firebase rules
 - [ ] Add focused integration tests for Firebase flows
 - [ ] Test sign-out, session restoration and switching accounts
 - [ ] Prepare app icon, launch experience and App Store screenshots

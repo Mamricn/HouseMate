@@ -222,16 +222,49 @@ final class AppState {
             route = .main
             StartupDiagnostics.mark("Main route shown from cache")
 
-            Task { @MainActor [interactor] in
+            Task { @MainActor [weak self, interactor] in
                 await Task.yield()
                 interactor.restoreCachedHousehold(
                     cachedSession.household,
                     members: cachedSession.members
                 )
+
+                do {
+                    guard let refreshedHousehold = try await interactor
+                        .fetchHousehold(
+                            householdID: cachedSession.household.id
+                        ),
+                          let self,
+                          self.authUser?.uid == authUser.uid,
+                          self.currentHousehold?.id
+                            == cachedSession.household.id
+                    else {
+                        return
+                    }
+
+                    self.currentHousehold = refreshedHousehold
+                    self.householdMembers =
+                        interactor.currentHouseholdMembers
+                    self.startupCache.save(
+                        user: cachedSession.user,
+                        household: refreshedHousehold,
+                        members: self.householdMembers
+                    )
+                    StartupDiagnostics.mark(
+                        "Cached household refreshed in background"
+                    )
+                } catch {
+                    // Cached content remains visible when the background
+                    // refresh or invite migration is temporarily unavailable.
+                    StartupDiagnostics.mark(
+                        "Cached household refresh failed: "
+                        + error.localizedDescription
+                    )
+                }
             }
 
-            // Do not perform blocking Firestore document reads during launch.
-            // Feature data and household members refresh through listeners.
+            // The cached route remains non-blocking. Firebase refreshes the
+            // household and performs lightweight migrations in the background.
             return
         } else {
             route = .loading

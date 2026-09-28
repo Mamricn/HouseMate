@@ -11,6 +11,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:housemate-5fbc5.web.app</string>
+		<string>applinks:housemate-production-eb0a1.web.app</string>
 	</array>
 </dict>
 </plist>

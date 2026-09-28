@@ -57,6 +57,23 @@ enum AppEnvironment: String {
         }
     }
 
+    var invitationBaseURL: URL? {
+        switch self {
+        case .mock:
+            return URL(string: "housemate://join")
+
+        case .development:
+            return URL(string: "https://housemate-5fbc5.web.app/join")
+
+        case .production:
+            return URL(string: "https://housemate-production-eb0a1.web.app/join")
+        }
+    }
+
+    func invitationURL(inviteCode: String) -> URL? {
+        invitationBaseURL?.appending(path: inviteCode)
+    }
+
     var mixpanelToken: String? {
         let key: String
 
