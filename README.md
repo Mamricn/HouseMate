@@ -5,11 +5,10 @@ HouseMate is a native iOS app for organising everyday life in a shared home. It 
 This repository showcases a production-oriented SwiftUI codebase with environment-specific dependency injection, Firebase-backed collaboration, offline-friendly caching, push notifications and automated security tests.
 
 <p align="center">
-  <img src="docs/screenshots/01-home-overview.png" width="170" alt="HouseMate home overview">
-  <img src="docs/screenshots/02-household-features.png" width="170" alt="HouseMate household features">
-  <img src="docs/screenshots/03-bills.png" width="170" alt="HouseMate bill tracking">
-  <img src="docs/screenshots/04-chores.png" width="170" alt="HouseMate chore planning">
-  <img src="docs/screenshots/05-polls.png" width="170" alt="HouseMate household polls">
+  <img src="docs/screenshots/01-home-overview.png" width="180" alt="HouseMate home overview">
+  <img src="docs/screenshots/02-household-features.png" width="180" alt="HouseMate household features">
+  <img src="docs/screenshots/03-bills.png" width="180" alt="HouseMate bill tracking">
+  <img src="docs/screenshots/04-chores.png" width="180" alt="HouseMate chore planning">
 </p>
 
 ## Highlights
