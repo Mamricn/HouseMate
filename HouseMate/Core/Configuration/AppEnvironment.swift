@@ -95,6 +95,11 @@ enum AppEnvironment: String {
         let trimmedToken = token.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
-        return trimmedToken.isEmpty ? nil : trimmedToken
+        guard !trimmedToken.isEmpty,
+              !trimmedToken.hasPrefix("$(") else {
+            return nil
+        }
+
+        return trimmedToken
     }
 }

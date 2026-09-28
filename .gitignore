@@ -20,6 +20,13 @@ DerivedData/
 
 # Firebase config
 
+# Local Firebase app configuration (use the example file as a template)
+HouseMate/Core/Configuration/GoogleService-Info-Development.plist
+HouseMate/Core/Configuration/GoogleService-Info-Production.plist
+
+# Optional local build settings for analytics and service credentials
+HouseMate/Core/Configuration/LocalSecrets.xcconfig
+
 # Uncomment this if you'd like others to create their own Firebase project.
 # For a team working on the same Firebase project(s), it is recommended to leave
 # it commented so all members can deploy to the same project(s) in .firebaserc.

@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>MixpanelTokenDevelopment</key>
-	<string>116f2b64e76337eaadf4540fae35f4eb</string>
+	<string>$(MIXPANEL_TOKEN_DEVELOPMENT)</string>
 	<key>MixpanelTokenProduction</key>
-	<string>5d137463c46246d2e2f8223b10d8d6c8</string>
+	<string>$(MIXPANEL_TOKEN_PRODUCTION)</string>
 	<key>FirebaseMessagingInstallationIdEnabled</key>
 	<true/>
 	<key>CFBundleURLTypes</key>

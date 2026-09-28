@@ -301,7 +301,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [[ \"$CONFIGURATION\" == *Development* ]]; then\n  GSP_PATH=\"$PROJECT_DIR/HouseMate/Core/Configuration/GoogleService-Info-Development.plist\"\nelse\n  GSP_PATH=\"$PROJECT_DIR/HouseMate/Core/Configuration/GoogleService-Info-Production.plist\"\nfi\n\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\" -gsp \"$GSP_PATH\"\n";
+			shellScript = "if [[ \"$CONFIGURATION\" == *Mock* ]]; then\n  exit 0\nfi\n\nif [[ \"$CONFIGURATION\" == *Development* ]]; then\n  GSP_PATH=\"$PROJECT_DIR/HouseMate/Core/Configuration/GoogleService-Info-Development.plist\"\nelse\n  GSP_PATH=\"$PROJECT_DIR/HouseMate/Core/Configuration/GoogleService-Info-Production.plist\"\nfi\n\nif [[ ! -f \"$GSP_PATH\" ]]; then\n  echo \"warning: Firebase configuration is missing; skipping Crashlytics symbol upload.\"\n  exit 0\nfi\n\n\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\" -gsp \"$GSP_PATH\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
